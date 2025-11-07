@@ -3,12 +3,12 @@ from functools import reduce
 import ee
 
 from gee_biophys.config import ConfigParams
+from gee_biophys.models.s2biophys import eePipelinePredictMap, load_model_ensemble
+from gee_biophys.models.sl2p import load_SL2P_model
 from gee_biophys.utils_predict import (
     aggregate_ensemble_predictions,
     aggregate_imagecollection_simple,
 )
-from models.s2biophys import eePipelinePredictMap, load_model_ensemble
-from models.sl2p import load_SL2P_model
 
 
 def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Image:
@@ -32,11 +32,11 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
         gee_preds = {}
         for i, (model_name, model) in enumerate(s2biophys_model_ensemble.items()):
             gee_preds[model_name] = eePipelinePredictMap(
-                pipeline=model["pipeline"],
+                pipeline=model.pipeline,
                 imgc=input_imgc,
                 trait=cfg.variables.variable,
-                model_config=model["config"],
-                min_max_bands=model["min_max_bands"],
+                model_config=model.config,
+                min_max_bands=model.min_max_bands,
                 min_max_label=None,
             )
 

@@ -42,7 +42,7 @@ app = typer.Typer(
 @app.command(help="Run the export using the provided YAML configuration.")
 def run(
     config: Path = typer.Option(
-        ...,
+        "example_configs/minimal_example.yaml",
         "--config",
         "-c",
         help="Path to params YAML file.",

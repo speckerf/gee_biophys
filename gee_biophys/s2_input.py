@@ -5,8 +5,8 @@ import ee
 from loguru import logger
 
 from gee_biophys.config import ConfigParams
-from models.s2biophys import prepare_s2_input_for_specker
-from models.sl2p import prepare_s2_input_for_sl2p
+from gee_biophys.models.s2biophys import prepare_s2_input_for_specker
+from gee_biophys.models.sl2p import prepare_s2_input_for_sl2p
 
 
 def get_s2_imgc(

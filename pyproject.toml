@@ -31,3 +31,14 @@ build-backend = "setuptools.build_meta"
 # package your three code trees; skip non-code dirs
 include = ["gee_biophys*", "models*", "train_pipeline*"]
 exclude = ["notebooks*", "example_configs*", "test_configs*", "deprecated*", "geometries*", "auth*"]
+
+[tool.setuptools.package-data]
+"gee_biophys.models" = [
+  "sl2p_params/*.json", 
+  "specker_params/**/*.pkl",
+  "specker_params/**/*.json",
+]
+# (optional) ensure data is included
+[tool.setuptools]
+include-package-data = true
+
