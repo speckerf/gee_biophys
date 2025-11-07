@@ -17,7 +17,7 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
     and return an ImageCollection with predicted biophysical variables.
     """
     if cfg.variables.model == "sl2p":
-        model_mean, model_std = load_SL2P_model()
+        model_mean, model_std = load_SL2P_model(variable=cfg.variables.variable)
 
         pred_mean_imgc = input_imgc.map(lambda img: model_mean.ee_predict(img))
         pred_std_imgc = input_imgc.map(lambda img: model_std.ee_predict(img))

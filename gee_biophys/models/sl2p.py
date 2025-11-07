@@ -1,7 +1,7 @@
 import json
 import os
 from importlib.resources import files
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 import ee
 import numpy as np
@@ -207,12 +207,23 @@ class LeafToolbox_MLPRegressor:
         return self.predict(X), invalid_mask
 
 
-def load_SL2P_model(variable="lai"):
+def load_SL2P_model(
+    variable: Literal["lai", "laie", "fapar", "fcover"],
+) -> Tuple[LeafToolbox_MLPRegressor, LeafToolbox_MLPRegressor]:
+
+    # remap to trait names used in SL2P parameter files
+    trait_map = {
+        "lai": "LAI",
+        "laie": "LAI",
+        "fapar": "fAPAR",
+        "fcover": "fCOVER",
+    }
+    variable_mapped = trait_map[variable]
 
     package = "gee_biophys.models.sl2p_params"
 
-    estimate_file = f"{variable}-estimation_SL2P_Corrected_LeafToolBox.json"
-    uncertainty_json = f"{variable}-uncertainty_SL2P_Corrected_LeafToolBox.json"
+    estimate_file = f"{variable_mapped}-estimation_SL2P_Corrected_LeafToolBox.json"
+    uncertainty_json = f"{variable_mapped}-uncertainty_SL2P_Corrected_LeafToolBox.json"
 
     with (files(package) / estimate_file).open("r") as f:
         estimate_params = json.load(f)
