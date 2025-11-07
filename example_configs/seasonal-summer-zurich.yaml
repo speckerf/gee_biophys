@@ -1,0 +1,34 @@
+spatial:
+  type: geojson # options: bbox, geojson
+  # bbox: [7.1, 46.1, 7.2, 46.2] # [minLon, minLat, maxLon, maxLat]
+  geojson_path: geometries/zurich.geojson # (used if type is geojson)
+  region_name: summer-zurich # no spaces, no underscores
+  geojson_clip: true
+
+temporal:
+  start: "2018-01-01"
+  end:   "2025-12-31"
+  cadence:
+    type: seasons
+    start: "05-15"
+    end:   "09-15"
+
+variables:
+  model: s2biophys # options: s2biophys, sl2p
+  variable: laie # laie, fapar, fcover
+  bands: [mean, stdDev, count] 
+
+options:
+  max_cloud_cover: 70 
+  csplus_band: 'cs_cdf' # options: cs, cs_cdf (cloud score plus band)
+  cs_plus_threshold: 0.65
+
+export:
+  project_id: ee-speckerfelix
+  destination: asset # options: asset, drive, gcs
+  collection_path: projects/ee-speckerfelix/assets/custom-exports/summer-zurich # used if destination is asset
+  # folder: biophys_exports # used if destination is drive or gcs
+  # bucket: your-gcs-bucket-name # used if destination is gcs
+  crs: EPSG:4326
+  scale: 100
+  max_pixels: 100_000_000_000 # 1e11

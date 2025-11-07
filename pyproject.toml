@@ -1,0 +1,33 @@
+[project]
+name = "gee-biophys"
+version = "0.1.0"
+description = "Custom time-series export of LAIe/FAPAR/FCOVER with YAML params."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Felix Specker", email = "felix.specker@wsl.ch" }
+]
+license = { text = "MIT" } 
+dependencies = [
+    "earthengine-api>=1.6.15",
+    "geojson>=3.2.0",
+    "loguru>=0.7.3",
+    "numpy",
+    "pydantic>=2.12.4",
+    "python-dateutil>=2.9.0.post0",
+    "pyyaml>=6.0.3",
+    "scikit-learn==1.5.1",
+    "typer>=0.12.0",
+]
+
+[project.scripts]
+gee-biophys = "gee_biophys.cli:app"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# package your three code trees; skip non-code dirs
+include = ["gee_biophys*", "models*", "train_pipeline*"]
+exclude = ["notebooks*", "example_configs*", "test_configs*", "deprecated*", "geometries*", "auth*"]

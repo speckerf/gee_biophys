@@ -1,0 +1,36 @@
+# ============     GEE-Biophys  ================
+# Minimal Example (small exports for testing)
+# ==============================================
+
+spatial:
+  type: bbox                      # options: bbox, geojson
+  bbox: [7.1, 46.1, 7.2, 46.2]    # [minLon(minx), minLat(miny), maxLon(maxy)]
+  region_name: my-region          # optional; no spaces or underscores
+
+temporal:
+  start: "2020-01-01"
+  end:   "2023-01-01"
+  cadence:
+    type: fixed                   # options: fixed, seasons
+    interval: quarterly
+
+variables:
+  model: sl2p                # options: s2biophys, sl2p
+  variable: laie                  # options: laie, fapar, fcover
+  bands: [mean, stdDev, count]    # allowed: mean, stdDev, count / bandnames will be {variable}_{band}
+
+export:
+  # Destination discriminator & required fields
+  destination: asset              # options: asset, drive, gcs
+  collection_path: "projects/ee-speckerfelix/assets/custom-exports/test"
+  project_id: "ee-speckerfelix"    # optional GEE project id for exports
+  crs: "EPSG:4326"                # e.g., use local UTM for regional accuracy (EPSG:32630, 32723, etc.) (avoids reprojection from S2 native)
+  scale: 100                      # meters per pixel (PositiveInt)
+  max_pixels: 100_000_000_000     # default 1e11
+
+options:
+  max_cloud_cover: 70             # 0..100 (uses S2 metadata if applicable)
+  csplus_band: cs_cdf             # options: cs, cs_cdf
+  cs_plus_threshold: 0.65         # 0.0..1.0 (higher = more conservative)
+
+version: "v02"                    # corresponds to current s2biophys version, allows future changes

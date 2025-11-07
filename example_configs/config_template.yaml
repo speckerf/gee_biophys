@@ -1,0 +1,62 @@
+# ============     GEE-Biophys  ================
+# Temporal On-Demand Exports — Reference Config
+# ==============================================
+
+spatial:
+  # Choose exactly ONE input: 'bbox' OR 'geojson'
+  type: bbox                      # options: bbox, geojson
+  bbox: [7.1, 46.1, 7.2, 46.2]    # [minLon(minx), minLat(miny), maxLon(maxy)]
+  # geojson_path: "path/to/area.geojson"   # (use if type == geojson; .geojson/.json)
+  region_name: my-region          # optional; no spaces or underscores
+  # geojson_clip: false             # if type == geojson: clip to geometry bounds when true
+
+temporal:
+  # Dates can be given as simple YYYY-MM-DD; they are parsed and normalized to UTC internally.
+  start: "2020-01-01"
+  end:   "2023-01-01"
+
+  # Cadence discriminator (exactly one of 'fixed' or 'seasons').
+  cadence:
+    type: fixed                   # options: fixed, seasons
+    # For 'fixed':
+    # - Use an int for N-day steps (e.g., 16), OR one of:
+    #   weekly | biweekly | monthly | bimonthly | quarterly | yearly (alias: annual)
+    interval: quarterly
+
+    # If you instead want seasonal windows (cross-year allowed), use:
+    # type: seasons
+    # start: "11-15"              # MM-DD (zero-padded)
+    # end:   "03-15"              # MM-DD (zero-padded)
+
+variables:
+  model: s2biophys                # options: s2biophys, sl2p
+  variable: laie                  # options: laie, fapar, fcover
+  bands: [mean, stdDev, count]    # allowed: mean, stdDev, count / bandnames will be {variable}_{band}
+
+export:
+  # Destination discriminator & required fields
+  destination: asset              # options: asset, drive, gcs
+
+  # If destination == 'asset' (REQUIRED):
+  collection_path: "projects/ee-yourproject/assets/custom-exports/test"
+
+  # If destination == 'drive' (REQUIRED):
+  # folder: "biophys_exports"
+
+  # If destination == 'gcs'  (REQUIRED):
+  # bucket: "your-gcs-bucket-name"
+  # folder: "biophys_exports"     # optional object prefix for GCS
+
+  # Common options
+  project_id: "ee-yourproject"    # optional GEE project id for exports
+  filename_prefix: "biophys"      # base name for export files
+  crs: "EPSG:4326"                # e.g., use UTM for regional accuracy (EPSG:32630, 32723, etc.)
+  scale: 100                      # meters per pixel (PositiveInt)
+  max_pixels: 100_000_000_000     # e.g. default 1e11
+
+options:
+  max_cloud_cover: 70             # 0..100 (uses S2 metadata if applicable)
+  csplus_band: cs_cdf             # options: cs, cs_cdf
+  cs_plus_threshold: 0.65         # 0.0..1.0 (higher = more conservative)
+
+version: "v02"                    # corresponds to current s2biophys version, allows future changes

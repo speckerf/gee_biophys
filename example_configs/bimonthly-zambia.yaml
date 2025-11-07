@@ -1,0 +1,29 @@
+spatial:
+  type: bbox # options: bbox, geojson
+  bbox: [31.5, -13.0, 31.6, -12.9] # [minLon, minLat, maxLon, maxLat]
+  region_name: luangwa-zambia # no spaces, no underscores
+
+temporal:
+  start: "2019-01-01"
+  end:   "2025-01-01"
+  cadence:
+    type: fixed
+    interval: bimonthly
+
+variables:
+  model: s2biophys # options: s2biophys, sl2p
+  variable: fcover # laie, fapar, fcover
+  bands: [mean] 
+
+options:
+  max_cloud_cover: 70 
+  csplus_band: 'cs_cdf' # options: cs, cs_cdf (cloud score plus band)
+  cs_plus_threshold: 0.65
+
+export:
+  project_id: ee-speckerfelix
+  destination: asset # options: asset, drive, gcs
+  collection_path: projects/ee-speckerfelix/assets/custom-exports/zambia-monthly # used if destination is asset
+  crs: EPSG:32736
+  scale: 20
+  max_pixels: 100_000_000_000 # 1e11
