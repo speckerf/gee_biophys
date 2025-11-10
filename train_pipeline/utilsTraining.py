@@ -44,7 +44,7 @@ class NIRvTransformer(BaseEstimator, TransformerMixin):
 
         if np.any(NIRv == 0):
             logger.warning(
-                "NIRv is 0 for some samples, setting to mean of non-zero values"
+                "NIRv is 0 for some samples, setting to mean of non-zero values",
             )
             NIRv[NIRv == 0] = np.mean(NIRv[NIRv != 0])
 
@@ -96,19 +96,26 @@ def get_pipeline(model: BaseEstimator, config: dict) -> Pipeline:
 
     if config["transform_target"] == "log1p":
         regressor = TransformedTargetRegressor(
-            regressor=model, func=np.log1p, inverse_func=np.expm1
+            regressor=model,
+            func=np.log1p,
+            inverse_func=np.expm1,
         )
     elif config["transform_target"] == "standard":
         regressor = TransformedTargetRegressor(
-            regressor=model, transformer=StandardScaler()
+            regressor=model,
+            transformer=StandardScaler(),
         )
     elif config["transform_target"] == "None":
         regressor = TransformedTargetRegressor(
-            regressor=model, func=identity, inverse_func=identity
+            regressor=model,
+            func=identity,
+            inverse_func=identity,
         )
     elif config["transform_target"] == "logit":
         regressor = TransformedTargetRegressor(
-            regressor=model, func=safe_logit, inverse_func=safe_inverse_logit
+            regressor=model,
+            func=safe_logit,
+            inverse_func=safe_inverse_logit,
         )
     else:
         raise ValueError(f"Unknown target transformation: {config['transform_target']}")
@@ -117,7 +124,7 @@ def get_pipeline(model: BaseEstimator, config: dict) -> Pipeline:
         steps=[
             ("preprocessor", preprocessor),
             ("regressor", regressor),
-        ]
+        ],
     )
 
     return pipeline

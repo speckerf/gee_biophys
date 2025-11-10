@@ -1,5 +1,4 @@
-"""
-gee_biophys: Tools for biophysical variable modeling and prediction with Google Earth Engine (GEE).
+"""gee_biophys: Tools for biophysical variable modeling and prediction with Google Earth Engine (GEE).
 
 This package provides:
 - Data preprocessing and Sentinel-2 input preparation (`s2_input`)

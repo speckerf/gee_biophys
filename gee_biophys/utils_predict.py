@@ -2,19 +2,23 @@ import ee
 
 
 def aggregate_imagecollection_simple(
-    imgc: ee.ImageCollection, trait_name: str, replications: int = 1
+    imgc: ee.ImageCollection,
+    trait_name: str,
+    replications: int = 1,
 ) -> ee.Image:
-    """
-    Aggregate an ImageCollection by calculating the mean, standard deviation, and count of images.
+    """Aggregate an ImageCollection by calculating the mean, standard deviation, and count of images.
+
     Args:
         imgc (ee.ImageCollection): The input ImageCollection containing predictions.
         trait_name (str): The name of the trait being predicted (used for naming output bands).
         replications (int, optional): The number of model replications used to generate the ImageCollection. Defaults to 1.
+
     Returns:
         ee.Image: An Image containing the mean, standard deviation, and count of predictions.
 
     Notes:
        - The count band is normalized by the number of replications to reflect the proportion of valid predictions.
+
     """
     mean_name = f"{trait_name}_mean"
     std_name = f"{trait_name}_stdDev"
@@ -32,7 +36,9 @@ def aggregate_imagecollection_simple(
 
 
 def aggregate_ensemble_predictions(
-    mean_imgc: ee.ImageCollection, std_imgc: ee.ImageCollection, trait_name: str
+    mean_imgc: ee.ImageCollection,
+    std_imgc: ee.ImageCollection,
+    trait_name: str,
 ) -> ee.Image:
     mean_name = f"{trait_name}_mean"
     std_name = f"{trait_name}_stdDev"

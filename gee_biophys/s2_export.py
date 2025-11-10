@@ -9,7 +9,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
 
     if cfg.spatial.type == "geojson" and cfg.spatial.geojson_clip:
         logger.debug(
-            "Clipping export image to GeoJSON geometry bounds. Please be aware of potential issues with complex geometries. Set 'geojson_clip' to false to disable."
+            "Clipping export image to GeoJSON geometry bounds. Please be aware of potential issues with complex geometries. Set 'geojson_clip' to false to disable.",
         )
         image = image.clip(cfg.spatial.ee_geometry)
 
@@ -30,7 +30,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         image = image.float()  # to avoid error: Exported bands must have compatible data types; found inconsistent types: Float64 and Int32
         asset_id = f"{cfg.export.folder}/{filename}"
         logger.debug(
-            f"Exporting image to Google Drive file: {cfg.export.folder}/{filename}"
+            f"Exporting image to Google Drive file: {cfg.export.folder}/{filename}",
         )
         task = ee.batch.Export.image.toDrive(
             image=image,
@@ -49,7 +49,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         gcs_folder = cfg.export.folder
 
         logger.debug(
-            f"Exporting image to GCS bucket: gs://{bucket}/{gcs_folder}/{filename}"
+            f"Exporting image to GCS bucket: gs://{bucket}/{gcs_folder}/{filename}",
         )
         task = ee.batch.Export.image.toCloudStorage(
             image=image,

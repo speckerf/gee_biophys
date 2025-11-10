@@ -23,7 +23,7 @@ def validate_config(path: Path):
     if not path or not path.exists():
         raise typer.BadParameter(
             "Please provide a valid path to a YAML configuration file, e.g.:\n"
-            "  gee-biophys --config example_configs/minimal_example.yaml"
+            "  gee-biophys --config example_configs/minimal_example.yaml",
         )
     return path
 
@@ -53,7 +53,7 @@ def run_pipeline(config: str):
     for interval_start, interval_end in cfg.temporal.iter_date_ranges():
         # <---- Load Input ---->
         logger.info(
-            f"Processing interval: {interval_start.strftime('%Y-%m-%d')} to {interval_end.strftime('%Y-%m-%d')}"
+            f"Processing interval: {interval_start.strftime('%Y-%m-%d')} to {interval_end.strftime('%Y-%m-%d')}",
         )
         imgc = load_s2_input(cfg, interval_start, interval_end)
 
@@ -62,7 +62,10 @@ def run_pipeline(config: str):
 
         # <---- Update metadata ---->
         output_image = update_image_metadata(
-            output_image, interval_start, interval_end, cfg
+            output_image,
+            interval_start,
+            interval_end,
+            cfg,
         )
         filename = get_system_index(cfg, interval_start, interval_end)
 
@@ -70,7 +73,7 @@ def run_pipeline(config: str):
         export_image(output_image, filename, cfg)
 
     logger.info(
-        "Done! Exports have been started. Please check task status to see if they completed successfully."
+        "Done! Exports have been started. Please check task status to see if they completed successfully.",
     )
 
 

@@ -1,6 +1,6 @@
 import json
 from importlib.resources import files
-from typing import Literal, Optional, Tuple
+from typing import Literal
 
 import ee
 import numpy as np
@@ -13,14 +13,15 @@ class LeafToolbox_MLPRegressor:
         net: dict,
         domain_codes: list = None,
         clip_min_max: bool = False,
-        clip_trait: Optional[str] = None,
+        clip_trait: str | None = None,
     ) -> None:
         ### init original params
         # load params from json dict
         self.inp_slope = np.array(net["inp_slope"])
         self.inp_offset = np.array(net["inp_offset"])
         self.h1wt = np.array(net["h1wt"]).reshape(
-            len(net["h1bi"]), len(self.inp_offset)
+            len(net["h1bi"]),
+            len(self.inp_offset),
         )
         self.h1bi = np.array(net["h1bi"])
         self.h2wt = np.array(net["h2wt"]).reshape(1, len(self.h1bi))
@@ -33,7 +34,7 @@ class LeafToolbox_MLPRegressor:
         self.ee_inp_slope = ee.Array(self.inp_slope.tolist())
         self.ee_inp_offset = ee.Array(self.inp_offset.tolist())
         self.ee_h1wt = ee.Array(
-            self.h1wt.tolist()
+            self.h1wt.tolist(),
         ).transpose()  # its crucial to use transpose instead of reshape here!! (otherwise values fit into wrong positions)
 
         self.ee_h1bi = ee.Array(self.h1bi.tolist()).reshape([1, -1])
@@ -44,13 +45,13 @@ class LeafToolbox_MLPRegressor:
         self.ee_out_bias = ee.Array(self.out_bias.tolist())
 
         logger.debug(
-            f"SL2P init(): Make sure that the input data is ordered as in bandorder: {self.bandorder}"
+            f"SL2P init(): Make sure that the input data is ordered as in bandorder: {self.bandorder}",
         )
 
         if domain_codes is not None:
             self.domain_codes = domain_codes
             logger.debug(
-                f"SL2P init(): Domain codes for input validation provided: {self.domain_codes}"
+                f"SL2P init(): Domain codes for input validation provided: {self.domain_codes}",
             )
             self.init_domain_codes()
         else:
@@ -64,7 +65,7 @@ class LeafToolbox_MLPRegressor:
                 "fcover",
             ], "clip_trait must be one of 'lai', 'fapar', 'fcover'"
             logger.debug(
-                "clip_min_max=True is set. Predictions will be clipped to: 0-8 for LAI and 0-1 for FAPAR/FCOVER."
+                "clip_min_max=True is set. Predictions will be clipped to: 0-8 for LAI and 0-1 for FAPAR/FCOVER.",
             )
             self.clip_min_max = True
             self.clip_trait = clip_trait
@@ -79,8 +80,7 @@ class LeafToolbox_MLPRegressor:
         raise NotImplementedError("Domain code initialization not implemented yet.")
 
     def check_domain(self, X: np.ndarray) -> np.ndarray:
-        """
-        X: (n_samples, n_features)
+        """X: (n_samples, n_features)
         returns: boolean array of shape (n_samples,) indicating whether each sample is valid
         """
         if self.domain_codes is None:
@@ -98,8 +98,7 @@ class LeafToolbox_MLPRegressor:
         return flag
 
     def ee_check_domain(self, img: ee.Image) -> ee.Image:
-        """
-        img: ee.Image with bands ordered as in self.bandorder
+        """img: ee.Image with bands ordered as in self.bandorder
         returns: ee.Image with 1 for invalid pixels, 0 for valid pixels
         """
         # TODO: check function carefully!!!!!!! - Copilot generated
@@ -119,16 +118,16 @@ class LeafToolbox_MLPRegressor:
         # Comparing image to domain codes
         domain_codes_ee = ee.List(self.domain_codes)
         invalid_mask = image_format.remap(
-            domain_codes_ee, ee.List.repeat(0, domain_codes_ee.size()), 1
+            domain_codes_ee,
+            ee.List.repeat(0, domain_codes_ee.size()),
+            1,
         )
         return invalid_mask
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        X: (n_samples, n_features)
+        """X: (n_samples, n_features)
         returns: (n_samples,)
         """
-
         # input scaling
         Xs = X * self.inp_slope + self.inp_offset
 
@@ -156,11 +155,9 @@ class LeafToolbox_MLPRegressor:
         )
 
     def ee_predict(self, ee_img: ee.Image) -> ee.Image:
-        """
-        Predict using an ee.Image as input.
+        """Predict using an ee.Image as input.
         Returns an ee.Image with the prediction.
         """
-
         # TODO: check function carefully!!!!!!! - Copilot generated
         # Add test case that predict() and ee_predict() give same results on same data
 
@@ -171,7 +168,7 @@ class LeafToolbox_MLPRegressor:
         x = x.toArray(1).arrayTranspose()  # shape : (1, bands)
 
         h1 = self._tansig_ee(
-            x.matrixMultiply(ee.Image(self.ee_h1wt)).add(ee.Image(self.ee_h1bi))
+            x.matrixMultiply(ee.Image(self.ee_h1wt)).add(ee.Image(self.ee_h1bi)),
         )  # (1, bands) x (bands, n_nodes) = (1, n_nodes)
 
         # linear output layer
@@ -192,14 +189,14 @@ class LeafToolbox_MLPRegressor:
 
         return y.arrayFlatten([["output"]])
 
-    def predict_with_domain_check(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def predict_with_domain_check(self, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if self.domain_codes is None:
             raise ValueError("Domain codes not initialized.")
 
         invalid_mask = self.check_domain(X)
         if np.any(invalid_mask):
             logger.warning(
-                f"{np.sum(invalid_mask)} samples are outside the valid input domain."
+                f"{np.sum(invalid_mask)} samples are outside the valid input domain.",
             )
 
         return self.predict(X), invalid_mask
@@ -207,7 +204,7 @@ class LeafToolbox_MLPRegressor:
 
 def load_SL2P_model(
     variable: Literal["lai", "laie", "fapar", "fcover"],
-) -> Tuple[LeafToolbox_MLPRegressor, LeafToolbox_MLPRegressor]:
+) -> tuple[LeafToolbox_MLPRegressor, LeafToolbox_MLPRegressor]:
     # remap to trait names used in SL2P parameter files
     trait_map = {
         "lai": "LAI",
@@ -238,16 +235,18 @@ def load_SL2P_model(
 
 
 def _ee_angle_transform_sl2p(angle_img: ee.Image) -> ee.Image:
-    """
-    Transform angle bands from degrees to the format required by SL2P:
+    """Transform angle bands from degrees to the format required by SL2P:
     - Convert degrees to radians
     - Compute cosine of the angles
 
-    Parameters:
+    Parameters
+    ----------
     - angle_img (ee.Image): Image with angle bands in degrees.
 
-    Returns:
+    Returns
+    -------
     - ee.Image: Image with angle bands transformed for SL2P.
+
     """
     radians_img = angle_img.multiply(np.pi / 180.0)
     cos_img = radians_img.cos()
@@ -255,14 +254,17 @@ def _ee_angle_transform_sl2p(angle_img: ee.Image) -> ee.Image:
 
 
 def prepare_s2_input_for_sl2p(img: ee.Image) -> ee.Image:
-    """
-    Prepare Sentinel-2 image for SL2P model input.
-    Parameters:
-    - img (ee.Image): Input Sentinel-2 image with bands and angles.
-    Returns:
-    - ee.Image: Image with bands ordered and angles transformed for SL2P.
-    """
+    """Prepare Sentinel-2 image for SL2P model input.
 
+    Parameters
+    ----------
+    - img (ee.Image): Input Sentinel-2 image with bands and angles.
+
+    Returns
+    -------
+    - ee.Image: Image with bands ordered and angles transformed for SL2P.
+
+    """
     # Bands/angles expected on the input S2 image
     _s2_bands = ["B3", "B4", "B5", "B6", "B7", "B8A", "B11", "B12"]
     _s2_angles = ["tts", "tto", "psi"]
@@ -273,7 +275,7 @@ def prepare_s2_input_for_sl2p(img: ee.Image) -> ee.Image:
 
     refl = img.select(_s2_bands)
     cos_angles = _ee_angle_transform_sl2p(img.select(_s2_angles)).rename(
-        _sl2p_angle_names
+        _sl2p_angle_names,
     )
 
     out = refl.addBands(cos_angles)

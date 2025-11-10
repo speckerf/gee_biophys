@@ -5,7 +5,7 @@ from glob import glob
 from importlib.resources import files
 from pathlib import Path
 from pickle import load as pickle_load
-from typing import Any, Dict, Optional
+from typing import Any
 
 import ee
 import numpy as np
@@ -39,7 +39,7 @@ def ee_logit_transform(image: ee.Image, trait: str):
     # logit transformation of trait
     #  np.log(x / (1 - x))
     image = image.addBands(
-        image.select(trait).log().divide(image.select(trait).subtract(1))
+        image.select(trait).log().divide(image.select(trait).subtract(1)),
     )
     return image
 
@@ -63,8 +63,8 @@ def eePipelinePredictMap(
     imgc: ee.ImageCollection,
     trait: str,
     model_config: dict,
-    min_max_bands: Optional[dict] = None,
-    min_max_label: Optional[dict] = None,
+    min_max_bands: dict | None = None,
+    min_max_label: dict | None = None,
 ):
     # get the bands and angles
     bands = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
@@ -97,7 +97,8 @@ def eePipelinePredictMap(
     if model_config["model"] == "mlp":
         # IMPORTANT: .regressor_ refers to the actual model, while .regressor only refers to the untrained model
         ee_model = eeMLPRegressor(
-            pipeline.named_steps["regressor"].regressor_, trait_name=trait
+            pipeline.named_steps["regressor"].regressor_,
+            trait_name=trait,
         )
     else:
         raise ValueError("Only mlp models are supported for now")
@@ -106,27 +107,33 @@ def eePipelinePredictMap(
     # apply inverse transformations
     if model_config["transform_target"] == "log1p":
         imgc = imgc.map(
-            lambda image: ee_log1p_inverse_transform(image, trait).copyProperties(image)
+            lambda image: ee_log1p_inverse_transform(image, trait).copyProperties(
+                image
+            ),
         )
     elif model_config["transform_target"] == "logit":
         imgc = imgc.map(
-            lambda image: ee_logit_inverse_transform(image, trait).copyProperties(image)
+            lambda image: ee_logit_inverse_transform(image, trait).copyProperties(
+                image
+            ),
         )
     elif model_config["transform_target"] == "standard":
         target_scaler = pipeline.named_steps["regressor"].transformer_
         target_ee_scaler = eeStandardScaler(
-            target_scaler, feature_names=[trait]
+            target_scaler,
+            feature_names=[trait],
         )  # must be a list
         imgc = imgc.map(
             lambda image: target_ee_scaler.inverse_transform_column(
-                image, trait
-            ).copyProperties(image)
+                image,
+                trait,
+            ).copyProperties(image),
         )
     elif model_config["transform_target"] == "None":
         imgc = imgc
     else:
         raise ValueError(
-            f"Unknown target transformation: {model_config['transform_target']}"
+            f"Unknown target transformation: {model_config['transform_target']}",
         )
 
     if min_max_label is not None:
@@ -136,7 +143,7 @@ def eePipelinePredictMap(
                 min_max_label = {"laie": min_max_label["lai"]}
             else:
                 raise ValueError(
-                    f"Trait {trait} does not match min_max_label keys: {list(min_max_label.keys())}"
+                    f"Trait {trait} does not match min_max_label keys: {list(min_max_label.keys())}",
                 )
             # swap lai with
         min_max_label_masker = eeMinMaxRangeMasker(min_max_label, tolerance=0.0)
@@ -171,11 +178,11 @@ def load_model_ensemble(trait: str) -> dict:
     if not base.is_dir():
         raise FileNotFoundError(
             f"Packaged models for trait '{trait}' not found at {base}. "
-            "Ensure files are included via [tool.setuptools.package-data]."
+            "Ensure files are included via [tool.setuptools.package-data].",
         )
 
     testsets = range(5)
-    models: Dict[str, EnsembleItem] = {}
+    models: dict[str, EnsembleItem] = {}
 
     for t in testsets:
         name = f"optuna-v2-{trait}-mlp-split-{t}"
@@ -200,7 +207,7 @@ def load_model_ensemble(trait: str) -> dict:
             details = "\n".join(f"  - {k}: {required[k]}" for k in missing)
             raise FileNotFoundError(
                 f"Missing required model files for '{name}':\n{details}\n"
-                "Make sure they are packaged and names match the expected pattern."
+                "Make sure they are packaged and names match the expected pattern.",
             )
 
         item = EnsembleItem(
@@ -228,13 +235,13 @@ def load_model_ensemble(trait: str) -> dict:
             "pipeline": glob(os.path.join(dir_path, f"model_{name}.pkl"))[0],
             "config": glob(os.path.join(dir_path, f"model_{name}_config.json"))[0],
             "model_path": os.path.basename(
-                glob(os.path.join(dir_path, f"model_{name}.pkl"))[0]
+                glob(os.path.join(dir_path, f"model_{name}.pkl"))[0],
             ).removesuffix(".pkl"),
             "min_max_bands": glob(
-                os.path.join(dir_path, f"min_max_band_values_{name}.json")
+                os.path.join(dir_path, f"min_max_band_values_{name}.json"),
             )[0],
             "min_max_label": glob(
-                os.path.join(dir_path, f"min_max_label_values_{name}.json")
+                os.path.join(dir_path, f"min_max_label_values_{name}.json"),
             )[0],
             "split": os.path.join(dir_path, f"model_{name}_split.json"),
         }
@@ -259,7 +266,7 @@ def load_model_ensemble(trait: str) -> dict:
 
         # load JSON configs safely
         def load_json(path: str | Path):
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
 
         # load pickle
@@ -279,16 +286,17 @@ def load_model_ensemble(trait: str) -> dict:
 
 
 def prepare_s2_input_for_specker(img: ee.Image) -> ee.Image:
-    """
-    Prepare Sentinel-2 image for Specker et al. model prediction by selecting and ordering bands.
+    """Prepare Sentinel-2 image for Specker et al. model prediction by selecting and ordering bands.
 
-    Parameters:
+    Parameters
+    ----------
     - img (ee.Image): Input Sentinel-2 image with bands.
 
-    Returns:
+    Returns
+    -------
     - ee.Image: Image with bands ordered as required by Specker et al. model.
-    """
 
+    """
     bands = [
         "B2",
         "B3",

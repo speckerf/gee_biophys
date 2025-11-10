@@ -16,8 +16,7 @@ def get_s2_imgc(
     max_cloud_cover: int,
     bands: list = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"],
 ) -> ee.ImageCollection:
-    """
-    Retrieve Sentinel-2 image collection for the specified date range and region,
+    """Retrieve Sentinel-2 image collection for the specified date range and region,
     selecting only the specified bands.
     """
     collection = (
@@ -46,25 +45,22 @@ def apply_cloudscore_plus_mask(
     csplus_band: Literal["cs", "cs_cdf"],
     csplus_threshold: float,
 ) -> ee.ImageCollection:
-    """
-    Apply the CloudScorePlus algorithm to the given Sentinel-2 image collection
+    """Apply the CloudScorePlus algorithm to the given Sentinel-2 image collection
     and mask out cloudy pixels.
     """
-
     csplus_imgc = ee.ImageCollection("GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED")
 
     linked_imgc = s2_imgc.linkCollection(csplus_imgc, [csplus_band])
 
     s2_imgc_masked = linked_imgc.map(
-        lambda image: image.updateMask(image.select(csplus_band).gte(csplus_threshold))
+        lambda image: image.updateMask(image.select(csplus_band).gte(csplus_threshold)),
     )
 
     return s2_imgc_masked.select(s2_imgc.first().bandNames())
 
 
 def add_angles_from_metadata_to_bands(image: ee.Image) -> ee.Image:
-    """
-    Add viewing/illumination angle bands (in degrees) derived from image metadata.
+    """Add viewing/illumination angle bands (in degrees) derived from image metadata.
 
     This function reads Sentinel-2 metadata fields to:
       - compute the mean **view zenith** and **view azimuth** across bands B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12,
@@ -92,8 +88,8 @@ def add_angles_from_metadata_to_bands(image: ee.Image) -> ee.Image:
     -------
     ee.Image
         The input image with added bands: 'tts', 'tto', and 'psi' (float32, degrees).
-    """
 
+    """
     # Define the bands for which view angles are extracted from metadata.
     bands = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
 
@@ -104,7 +100,7 @@ def add_angles_from_metadata_to_bands(image: ee.Image) -> ee.Image:
     # Calculate the mean view azimuth angle for the specified bands.
     view_azimuth = (
         ee.Array(
-            [image.getNumber("MEAN_INCIDENCE_AZIMUTH_ANGLE_%s" % b) for b in bands]
+            [image.getNumber("MEAN_INCIDENCE_AZIMUTH_ANGLE_%s" % b) for b in bands],
         )
         .reduce(ee.Reducer.mean(), [0])
         .get([0])
@@ -121,18 +117,18 @@ def add_angles_from_metadata_to_bands(image: ee.Image) -> ee.Image:
     image = image.addBands(ee.Image(solar_zenith).toFloat().rename("tts"))
     image = image.addBands(ee.Image(view_zenith).toFloat().rename("tto"))
     image = image.addBands(
-        ee.Image(view_azimuth.subtract(solar_azimuth).abs()).toFloat().rename("psi")
+        ee.Image(view_azimuth.subtract(solar_azimuth).abs()).toFloat().rename("psi"),
     )
 
     return image
 
 
 def load_s2_input(
-    cfg: ConfigParams, interval_start: datetime, interval_end: datetime
+    cfg: ConfigParams,
+    interval_start: datetime,
+    interval_end: datetime,
 ) -> ee.ImageCollection:
-    """
-    Load and prepare Sentinel-2 ImageCollection based on configuration parameters.
-    """
+    """Load and prepare Sentinel-2 ImageCollection based on configuration parameters."""
     s2_imgc = get_s2_imgc(
         start_date=interval_start,
         end_date=interval_end,

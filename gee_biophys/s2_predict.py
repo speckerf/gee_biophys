@@ -12,8 +12,7 @@ from gee_biophys.utils_predict import (
 
 
 def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Image:
-    """
-    Apply the selected biophysical model to the input Sentinel-2 ImageCollection
+    """Apply the selected biophysical model to the input Sentinel-2 ImageCollection
     and return an ImageCollection with predicted biophysical variables.
     """
     if cfg.variables.model == "sl2p":
@@ -23,7 +22,9 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
         pred_std_imgc = input_imgc.map(lambda img: model_std.ee_predict(img))
 
         output_image = aggregate_ensemble_predictions(
-            pred_mean_imgc, pred_std_imgc, cfg.variables.variable
+            pred_mean_imgc,
+            pred_std_imgc,
+            cfg.variables.variable,
         )
 
     elif cfg.variables.model == "s2biophys":

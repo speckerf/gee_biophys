@@ -37,8 +37,7 @@ def get_system_index(
 
 
 def _get_cfg_string(cfg: ConfigParams) -> str:
-    """
-    Generate a string representation of the configuration parameters.
+    """Generate a string representation of the configuration parameters.
     This can be used for metadata or logging purposes.
     """
     cfg_parts = [
@@ -58,20 +57,21 @@ def update_image_metadata(
     interval_end: datetime,
     cfg: ConfigParams,
 ) -> ee.Image:
-    """
-    Update the metadata of the given image with export configuration details.
+    """Update the metadata of the given image with export configuration details.
+
     Args:
         image (ee.Image): The image whose metadata needs to be updated.
         interval_start (datetime): Start date of the interval.
         interval_end (datetime): End date of the interval.
         export_config (dict): The export configuration dictionary.
+
     Returns:
         ee.Image: The image with updated metadata.
         ["system:time_start", "system:time_end", "model", "variable", "export_scale", "output_crs", "system:index"]
 
         # system:index follows filenaming convention: [variable]_[model]_[output_bands (joined by '-')]_[output_resolution]m_s_[startdate(YYYYMMDD)]_[enddate(YYYYMMDD)]_[tile]_[crs(epsg lower and swap : with .)]_[version]
-    """
 
+    """
     index_str = get_system_index(cfg, interval_start, interval_end)
 
     cfg_string = _get_cfg_string(cfg)
@@ -86,14 +86,13 @@ def update_image_metadata(
             "output_crs": cfg.export.crs,
             "config": cfg_string,
             "system:index": index_str,
-        }
+        },
     )
     return updated_image
 
 
 def generate_intervals(start, end, temporal_interval):
-    """
-    Generate a list of (start, end) datetime tuples representing intervals
+    """Generate a list of (start, end) datetime tuples representing intervals
     between 'start' and 'end' based on the specified 'temporal_interval'.
     The 'temporal_interval' can be specified as:
     - An integer number of days
@@ -101,7 +100,7 @@ def generate_intervals(start, end, temporal_interval):
     - A string representing common periods like "daily", "weekly", "monthly", etc.
     """
     logger.debug(
-        f"Generating intervals from {start} to {end} with period {temporal_interval}"
+        f"Generating intervals from {start} to {end} with period {temporal_interval}",
     )
     if isinstance(temporal_interval, int):
         advance = lambda t: t + timedelta(days=temporal_interval)  # noqa
@@ -135,8 +134,7 @@ def generate_intervals(start, end, temporal_interval):
 
 
 def asset_exists(asset_id: str) -> bool:
-    """
-    Check if a given Earth Engine asset exists.
+    """Check if a given Earth Engine asset exists.
 
     Args:
         asset_id (str): Full Earth Engine asset ID, e.g.,
@@ -144,6 +142,7 @@ def asset_exists(asset_id: str) -> bool:
 
     Returns:
         bool: True if asset exists, False otherwise.
+
     """
     try:
         ee.data.getAsset(asset_id)
@@ -157,27 +156,28 @@ def initialize_export_location(cfg: ConfigParams):
     if loc == "asset":
         if asset_exists(cfg.export.collection_path):
             logger.warning(
-                f"Asset {cfg.export.collection_path} already exists. Image exports with existing asset IDs will fail (delete beforehand if overwrite is desired)."
+                f"Asset {cfg.export.collection_path} already exists. Image exports with existing asset IDs will fail (delete beforehand if overwrite is desired).",
             )
         else:
             logger.info(
-                f"Creating ImageCollection asset at {cfg.export.collection_path}."
+                f"Creating ImageCollection asset at {cfg.export.collection_path}.",
             )
             ee.data.createAsset({"type": "ImageCollection"}, cfg.export.collection_path)
 
             # add cfg string as property to ImageCollection asset
             cfg_string = _get_cfg_string(cfg)
             ee.data.setAssetProperties(
-                cfg.export.collection_path, {"config": cfg_string}
+                cfg.export.collection_path,
+                {"config": cfg_string},
             )
     elif loc == "drive":
         logger.info(
-            f"Assets will be exported to Google Drive folder: {cfg.export.folder}"
+            f"Assets will be exported to Google Drive folder: {cfg.export.folder}",
         )
 
     elif loc == "gcs":
         logger.info(
-            f"Assets will be exported to: gs://{cfg.export.bucket}/{cfg.export.folder}"
+            f"Assets will be exported to: gs://{cfg.export.bucket}/{cfg.export.folder}",
         )
     else:
         raise ValueError(f"Unknown output_location: {loc}")

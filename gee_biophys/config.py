@@ -1,9 +1,10 @@
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Iterator, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Literal
 
 import ee
 from loguru import logger
@@ -20,9 +21,9 @@ from pydantic import (
 # ----------------- Spatial -----------------
 class Spatial(BaseModel):
     type: Literal["bbox", "geojson"]
-    bbox: Optional[List[float]] = None  # [minx, miny, maxx, maxy]
-    geojson_path: Optional[str] = None
-    region_name: Optional[str] = (
+    bbox: list[float] | None = None  # [minx, miny, maxx, maxy]
+    geojson_path: str | None = None
+    region_name: str | None = (
         None  # optional name for the region (no spaces/underscores)
     )
     geojson_clip: bool = Field(
@@ -43,13 +44,13 @@ class Spatial(BaseModel):
             # assert not spaces and underscores
             if re.search(r"[ _]", self.region_name):
                 raise ValueError(
-                    "spatial.region_name must not contain spaces or underscores."
+                    "spatial.region_name must not contain spaces or underscores.",
                 )
 
         # exactly one must be provided
         if has_bbox == has_geo:
             raise ValueError(
-                "Specify exactly one of 'bbox' or 'geojson_path', not both."
+                "Specify exactly one of 'bbox' or 'geojson_path', not both.",
             )
 
         if self.type == "bbox":
@@ -57,7 +58,7 @@ class Spatial(BaseModel):
                 raise ValueError("When type='bbox', 'bbox' is required.")
             if len(self.bbox) != 4:
                 raise ValueError(
-                    "bbox must contain four numbers: [minx, miny, maxx, maxy]."
+                    "bbox must contain four numbers: [minx, miny, maxx, maxy].",
                 )
             minx, miny, maxx, maxy = self.bbox
             if not (minx < maxx and miny < maxy):
@@ -88,8 +89,8 @@ class Spatial(BaseModel):
         """Return an ee.Geometry derived from this spatial definition."""
         if self.type == "bbox":
             return ee.Geometry.BBox(*self.bbox)
-        elif self.type == "geojson":
-            with open(self.geojson_path, "r", encoding="utf-8") as f:
+        if self.type == "geojson":
+            with open(self.geojson_path, encoding="utf-8") as f:
                 obj = json.load(f)
 
             t = obj.get("type", "").lower()
@@ -102,7 +103,7 @@ class Spatial(BaseModel):
                 "featurecollection",
             ):
                 raise ValueError(
-                    f"GeoJSON 'type' must be 'Polygon', 'MultiPolygon', 'Feature', or 'FeatureCollection', got '{t}'."
+                    f"GeoJSON 'type' must be 'Polygon', 'MultiPolygon', 'Feature', or 'FeatureCollection', got '{t}'.",
                 )
 
             if t in ("polygon", "multipolygon"):
@@ -123,18 +124,16 @@ class Spatial(BaseModel):
                     # single feature -> use its geometry
                     first = ee.Feature(fc.first())
                     return first.geometry()
-                else:
-                    logger.warning(
-                        "GeoJSON FeatureCollection has multiple features; dissolving to single geometry."
-                    )
-                    return fc.geometry()
+                logger.warning(
+                    "GeoJSON FeatureCollection has multiple features; dissolving to single geometry.",
+                )
+                return fc.geometry()
 
             raise ValueError(
-                f"Unsupported or missing GeoJSON 'type': {obj.get('type')}"
+                f"Unsupported or missing GeoJSON 'type': {obj.get('type')}",
             )
 
-        else:
-            raise ValueError(f"Unsupported spatial type: {self.type}")
+        raise ValueError(f"Unsupported spatial type: {self.type}")
 
 
 _MM_DD = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
@@ -143,19 +142,19 @@ _MM_DD = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
 def _safe_ymd(year: int, month: int, day: int) -> datetime:
     """Return a valid UTC datetime, replacing Feb 29 -> Feb 28 if needed."""
     try:
-        return datetime(year, month, day, tzinfo=timezone.utc)
+        return datetime(year, month, day, tzinfo=UTC)
     except ValueError:
         if month == 2 and day == 29:
-            return datetime(year, 2, 28, tzinfo=timezone.utc)
+            return datetime(year, 2, 28, tzinfo=UTC)
         raise
 
 
 # ---------- Cadences ----------
 class FixedCadence(BaseModel):
     type: Literal["fixed"]
-    interval: Union[
-        int,  # N-day step
-        Literal[
+    interval: (
+        int
+        | Literal[
             "weekly",
             "biweekly",
             "monthly",
@@ -163,8 +162,8 @@ class FixedCadence(BaseModel):
             "quarterly",
             "yearly",
             "annual",
-        ],
-    ]
+        ]
+    )
 
     model_config = ConfigDict(extra="forbid")
 
@@ -218,26 +217,25 @@ class Temporal(BaseModel):
             else:
                 dt = datetime.fromisoformat(s)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             if dt.utcoffset() != timedelta(0):
                 raise ValueError("Datetime must be UTC (use 'Z' or +00:00).")
             return dt
         except Exception:
             raise ValueError(
-                f"Invalid date string '{v}'. Use 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SSZ'."
+                f"Invalid date string '{v}'. Use 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SSZ'.",
             )
 
     # Public API: yield (start_dt, end_dt)
-    def iter_date_ranges(self) -> Iterator[Tuple[datetime, datetime]]:
+    def iter_date_ranges(self) -> Iterator[tuple[datetime, datetime]]:
         if isinstance(self.cadence, FixedCadence):
             yield from self._iter_fixed(self.cadence)
         else:
             yield from self._iter_seasons(self.cadence)
 
     # ---- Fixed intervals ----
-    def _iter_fixed(self, c: FixedCadence) -> Iterator[Tuple[datetime, datetime]]:
-        """
-        Yield fixed-length intervals clipped to [self.start, self.end).
+    def _iter_fixed(self, c: FixedCadence) -> Iterator[tuple[datetime, datetime]]:
+        """Yield fixed-length intervals clipped to [self.start, self.end).
         Raise a warning if the final interval is truncated at the temporal end.
         """
         if isinstance(c.interval, int):
@@ -248,7 +246,7 @@ class Temporal(BaseModel):
                 if t1 != t0 + step:
                     logger.warning(
                         f"Final interval from {t0.date()} to {t1.date()} is truncated "
-                        f"to fit within temporal.end {self.end.date()}."
+                        f"to fit within temporal.end {self.end.date()}.",
                     )
                 if t1 > t0:
                     yield (t0, t1)
@@ -264,7 +262,7 @@ class Temporal(BaseModel):
                 if t1 != t0 + step:
                     logger.warning(
                         f"Final interval '{name}' from {t0.date()} to {t1.date()} is truncated "
-                        f"to fit within temporal.end {self.end.date()}."
+                        f"to fit within temporal.end {self.end.date()}.",
                     )
                 if t1 > t0:
                     yield (t0, t1)
@@ -278,26 +276,24 @@ class Temporal(BaseModel):
             new_m = m + months
             y2 = y + (new_m - 1) // 12
             m2 = (new_m - 1) % 12 + 1
-            end_block = datetime(y2, m2, 1, tzinfo=timezone.utc)
+            end_block = datetime(y2, m2, 1, tzinfo=UTC)
             t1 = min(end_block, self.end)
             if t1 != end_block:
                 logger.warning(
                     f"Final interval '{name}' from {t.date()} to {t1.date()} is truncated "
-                    f"to fit within temporal.end {self.end.date()}."
+                    f"to fit within temporal.end {self.end.date()}.",
                 )
             if t1 > t:
                 yield (t, t1)
             t = t1
 
     # ---- Seasonal intervals (cross-year allowed) ----
-    def _iter_seasons(self, c: SeasonsCadence) -> Iterator[Tuple[datetime, datetime]]:
-        """
-        Yield exactly ONE tuple per season-year:
+    def _iter_seasons(self, c: SeasonsCadence) -> Iterator[tuple[datetime, datetime]]:
+        """Yield exactly ONE tuple per season-year:
         - same-year:  YYYY-MM-DD -> YYYY-MM-DD
         - cross-year: YYYY-MM-DD -> (YYYY+1)-MM-DD
         All windows are clipped to [self.start, self.end).
         """
-
         m1, d1 = map(int, c.start.split("-"))
         m2, d2 = map(int, c.end.split("-"))
 
@@ -320,7 +316,7 @@ class Temporal(BaseModel):
             ):
                 logger.warning(
                     f"Season ({c.start} until {c.end}) around {y} is truncated by "
-                    f"[{self.start.date()} — {self.end.date()}]."
+                    f"[{self.start.date()} — {self.end.date()}].",
                 )
 
             if start_clipped < end_clipped:
@@ -355,7 +351,7 @@ class Temporal(BaseModel):
                     logger.warning(
                         f"Season ({self.cadence.start} until {self.cadence.end}) near {year} "
                         f"is truncated by [{self.start.date()} — {self.end.date()}]. "
-                        "First or last seasonal composite may be partial."
+                        "First or last seasonal composite may be partial.",
                     )
                     break
         return self
@@ -367,15 +363,15 @@ class ExportOpts(BaseModel):
     destination: Literal["asset", "drive", "gcs"]
 
     # destination-specific
-    collection_path: Optional[str] = None  # required if asset
-    folder: Optional[str] = None  # required if drive; optional prefix if gcs
-    bucket: Optional[str] = None  # required if gcs
+    collection_path: str | None = None  # required if asset
+    folder: str | None = None  # required if drive; optional prefix if gcs
+    bucket: str | None = None  # required if gcs
 
     # common
-    project_id: Optional[str] = None  # GEE project ID for exports
+    project_id: str | None = None  # GEE project ID for exports
     filename_prefix: str = "biophys"
-    crs: Optional[str] = None  # e.g. "EPSG:4326"
-    scale: Optional[PositiveInt] = None  # meters
+    crs: str | None = None  # e.g. "EPSG:4326"
+    scale: PositiveInt | None = None  # meters
     max_pixels: int = Field(default=100_000_000_000, ge=1)
 
     # Enforce that *no other keys* are accepted
@@ -394,7 +390,7 @@ class ExportOpts(BaseModel):
         if self.destination == "asset":
             if not self.collection_path:
                 raise ValueError(
-                    "When destination='asset', 'collection_path' must be provided."
+                    "When destination='asset', 'collection_path' must be provided.",
                 )
         elif self.destination == "drive":
             if not self.folder:
@@ -405,7 +401,7 @@ class ExportOpts(BaseModel):
             # GCS object prefix is optional; if present, must be str
             if self.folder is not None and not isinstance(self.folder, str):
                 raise ValueError(
-                    "When destination='gcs', 'folder' must be a string if provided."
+                    "When destination='gcs', 'folder' must be a string if provided.",
                 )
         return self
 
@@ -414,7 +410,7 @@ class ExportOpts(BaseModel):
 class Variables(BaseModel):
     model: Literal["s2biophys", "sl2p"] = "s2biophys"
     variable: Literal["laie", "fapar", "fcover"] = "laie"
-    bands: List[Literal["mean", "stdDev", "count"]] = ["mean", "stdDev", "count"]
+    bands: list[Literal["mean", "stdDev", "count"]] = ["mean", "stdDev", "count"]
 
     # Enforce that *no other keys* are accepted
     model_config = ConfigDict(extra="forbid")
