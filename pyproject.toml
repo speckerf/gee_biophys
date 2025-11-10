@@ -3,7 +3,7 @@ name = "gee-biophys"
 version = "1.0.0"
 description = "Custom time-series export of LAIe/FAPAR/FCOVER with YAML params."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 authors = [
     { name = "Felix Specker", email = "felix.specker@wsl.ch" }
 ]
