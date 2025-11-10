@@ -1,6 +1,6 @@
 [project]
 name = "gee-biophys"
-version = "0.1.0"
+version = "1.0.0"
 description = "Custom time-series export of LAIe/FAPAR/FCOVER with YAML params."
 readme = "README.md"
 requires-python = ">=3.12"
