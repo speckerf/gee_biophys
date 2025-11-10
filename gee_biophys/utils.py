@@ -104,7 +104,7 @@ def generate_intervals(start, end, temporal_interval):
         f"Generating intervals from {start} to {end} with period {temporal_interval}"
     )
     if isinstance(temporal_interval, int):
-        advance = lambda t: t + timedelta(days=temporal_interval)
+        advance = lambda t: t + timedelta(days=temporal_interval)  # noqa
     elif isinstance(temporal_interval, str):
         temporal_interval = temporal_interval.lower()
         mapping = {
@@ -119,7 +119,7 @@ def generate_intervals(start, end, temporal_interval):
         if temporal_interval not in mapping:
             raise ValueError(f"Unknown period string: {temporal_interval}")
         delta = relativedelta(**mapping[temporal_interval])
-        advance = lambda t: t + delta
+        advance = lambda t: t + delta  # noqa
     else:
         raise TypeError("temporal_interval must be int, timedelta, or str")
 

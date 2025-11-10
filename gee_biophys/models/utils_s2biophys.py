@@ -163,7 +163,7 @@ class eeStandardScaler:
 
         if self.feature_names_ is None:
             logger.trace(
-                f"No feature_names provided; they will be set to the names scaler.feature_names_in_"
+                "No feature_names provided; they will be set to the names scaler.feature_names_in_"
             )
             self.feature_names_ = list(scaler.feature_names_in_)
         else:
@@ -199,7 +199,7 @@ class eeStandardScaler:
         return image_to_return
 
     def inverse_transform_column(self, image: ee.Image, column: str) -> ee.Image:
-        if not column in self.feature_names_:
+        if column not in self.feature_names_:
             raise ValueError(
                 f"Column {column} not in feature names: {self.feature_names_}"
             )
@@ -265,7 +265,6 @@ class eeMinMaxRangeMasker:
         self.ee_columns = ee.List(self.band_names)
 
     def ee_mask(self, image):
-
         selected_image = image.select(self.band_names)
         masked_image = selected_image.updateMask(
             selected_image.gte(self.ee_min_tolerance_image).And(

@@ -38,6 +38,11 @@ exclude = ["notebooks*", "example_configs*", "test_configs*", "deprecated*", "ge
   "specker_params/**/*.pkl",
   "specker_params/**/*.json",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.4",
+]
 # (optional) ensure data is included
 [tool.setuptools]
 include-package-data = true

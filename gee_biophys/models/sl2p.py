@@ -1,5 +1,4 @@
 import json
-import os
 from importlib.resources import files
 from typing import Literal, Optional, Tuple
 
@@ -16,7 +15,6 @@ class LeafToolbox_MLPRegressor:
         clip_min_max: bool = False,
         clip_trait: Optional[str] = None,
     ) -> None:
-
         ### init original params
         # load params from json dict
         self.inp_slope = np.array(net["inp_slope"])
@@ -210,7 +208,6 @@ class LeafToolbox_MLPRegressor:
 def load_SL2P_model(
     variable: Literal["lai", "laie", "fapar", "fcover"],
 ) -> Tuple[LeafToolbox_MLPRegressor, LeafToolbox_MLPRegressor]:
-
     # remap to trait names used in SL2P parameter files
     trait_map = {
         "lai": "LAI",

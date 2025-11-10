@@ -1,13 +1,11 @@
 import json
 import re
-import warnings
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from pathlib import Path
 from typing import Annotated, Iterator, List, Literal, Optional, Tuple, Union
 
 import ee
-import geojson
 from loguru import logger
 from pydantic import (
     BaseModel,

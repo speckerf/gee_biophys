@@ -40,18 +40,7 @@ app = typer.Typer(
 )
 
 
-@app.command(help="Run the export using the provided YAML configuration.")
-def run(
-    config: Path = typer.Option(
-        ...,
-        "--config",
-        "-c",
-        help="Path to params YAML file.",
-        callback=validate_config,
-        readable=True,
-    )
-):
-    typer.echo(f"Using configuration file: {config}")
+def run_pipeline(config: str):
     # <---- Setup ---->
     cfg = load_params(str(config))
 
@@ -62,7 +51,6 @@ def run(
 
     # <---- Main Loop ---->
     for interval_start, interval_end in cfg.temporal.iter_date_ranges():
-
         # <---- Load Input ---->
         logger.info(
             f"Processing interval: {interval_start.strftime('%Y-%m-%d')} to {interval_end.strftime('%Y-%m-%d')}"
@@ -82,9 +70,21 @@ def run(
         export_image(output_image, filename, cfg)
 
     logger.info(
-        f"Done! Exports have been started. Please check task status to see if they completed successfully."
+        "Done! Exports have been started. Please check task status to see if they completed successfully."
     )
 
 
-if __name__ == "__main__":
-    app()
+@app.command(help="Run the export using the provided YAML configuration.")
+def run(
+    config: Path = typer.Option(
+        ...,
+        "--config",
+        "-c",
+        help="Path to params YAML file.",
+        callback=validate_config,
+        readable=True,
+    ),
+):
+    """CLI entry point"""
+    typer.echo(f"Using configuration file: {config}")
+    run_pipeline(config)

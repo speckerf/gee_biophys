@@ -27,9 +27,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         )
         task.start()
     elif loc == "drive":
-        image = (
-            image.float()
-        )  # to avoid error: Exported bands must have compatible data types; found inconsistent types: Float64 and Int32
+        image = image.float()  # to avoid error: Exported bands must have compatible data types; found inconsistent types: Float64 and Int32
         asset_id = f"{cfg.export.folder}/{filename}"
         logger.debug(
             f"Exporting image to Google Drive file: {cfg.export.folder}/{filename}"
@@ -46,9 +44,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         )
         task.start()
     elif loc == "gcs":
-        image = (
-            image.float()
-        )  # to avoid error: Exported bands must have compatible data types; found inconsistent types: Float64 and Int32
+        image = image.float()  # to avoid error: Exported bands must have compatible data types; found inconsistent types: Float64 and Int32
         bucket = cfg.export.bucket
         gcs_folder = cfg.export.folder
 
