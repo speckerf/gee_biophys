@@ -41,6 +41,8 @@ exclude = ["notebooks*", "example_configs*", "test_configs*", "deprecated*", "ge
 
 [dependency-groups]
 dev = [
+    "pandas>=2.3.3",
+    "pytest>=9.0.0",
     "ruff>=0.14.4",
 ]
 # (optional) ensure data is included

@@ -91,3 +91,8 @@ def run(
     """CLI entry point"""
     typer.echo(f"Using configuration file: {config}")
     run_pipeline(config)
+
+
+if __name__ == "__main__":
+    config_path = Path("example_configs/minimal_example.yaml")
+    run_pipeline(config_path)  # for debugging purposes

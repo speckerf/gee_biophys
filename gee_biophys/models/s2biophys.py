@@ -1,7 +1,5 @@
 import json
-import os
 from dataclasses import dataclass
-from glob import glob
 from importlib.resources import files
 from pathlib import Path
 from pickle import load as pickle_load
@@ -63,8 +61,8 @@ def eePipelinePredictMap(
     imgc: ee.ImageCollection,
     trait: str,
     model_config: dict,
+    clip_min_max: bool,
     min_max_bands: dict | None = None,
-    min_max_label: dict | None = None,
 ):
     # get the bands and angles
     bands = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
@@ -136,18 +134,20 @@ def eePipelinePredictMap(
             f"Unknown target transformation: {model_config['transform_target']}",
         )
 
-    if min_max_label is not None:
-        if trait != list(min_max_label.keys())[0]:
-            if trait == "laie" and "lai" in min_max_label:
-                # swap lai with laie
-                min_max_label = {"laie": min_max_label["lai"]}
-            else:
-                raise ValueError(
-                    f"Trait {trait} does not match min_max_label keys: {list(min_max_label.keys())}",
-                )
-            # swap lai with
-        min_max_label_masker = eeMinMaxRangeMasker(min_max_label, tolerance=0.0)
-        imgc = imgc.map(min_max_label_masker.ee_mask)
+    if clip_min_max:
+        clip_dict = {
+            "lai": (0, 8),
+            "laie": (0, 8),
+            "fapar": (0, 1),
+            "fcover": (0, 1),
+        }
+        if trait in clip_dict:
+            min_val, max_val = clip_dict[trait]
+            imgc = imgc.map(
+                lambda image: image.clamp(min_val, max_val).copyProperties(image),
+            )
+        else:
+            raise ValueError(f"Clipping not defined for trait: {trait}")
 
     return imgc
 
@@ -160,6 +160,9 @@ class EnsembleItem:
     min_max_bands: dict
     min_max_label: dict
     split: dict
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
 
 
 def _open_json(p: Path) -> dict:
@@ -181,10 +184,10 @@ def load_model_ensemble(trait: str) -> dict:
             "Ensure files are included via [tool.setuptools.package-data].",
         )
 
-    testsets = range(5)
+    n_testsets = 5
     models: dict[str, EnsembleItem] = {}
 
-    for t in testsets:
+    for t in range(n_testsets):
         name = f"optuna-v2-{trait}-mlp-split-{t}"
 
         pipeline_path = base / f"model_{name}.pkl"
@@ -219,68 +222,6 @@ def load_model_ensemble(trait: str) -> dict:
             split=_open_json(split_path),
         )
         models[name] = item
-
-    return models
-
-    testsets = list(range(5))
-    study_version = "v2"
-    model_names = [
-        f"optuna-{study_version}-{trait}-mlp-split-{testset}" for testset in testsets
-    ]
-
-    # using glob, get all paths (with varying trial numbers)
-    dir_path = os.path.join("models", "specker_params", trait)
-    model_names_path = {
-        name: {
-            "pipeline": glob(os.path.join(dir_path, f"model_{name}.pkl"))[0],
-            "config": glob(os.path.join(dir_path, f"model_{name}_config.json"))[0],
-            "model_path": os.path.basename(
-                glob(os.path.join(dir_path, f"model_{name}.pkl"))[0],
-            ).removesuffix(".pkl"),
-            "min_max_bands": glob(
-                os.path.join(dir_path, f"min_max_band_values_{name}.json"),
-            )[0],
-            "min_max_label": glob(
-                os.path.join(dir_path, f"min_max_label_values_{name}.json"),
-            )[0],
-            "split": os.path.join(dir_path, f"model_{name}_split.json"),
-        }
-        for name in model_names
-    }
-
-    # load all models: "model_optuna-debug-{trait}-*.pkl" using pickle_load
-    models = {}
-    for name, paths in model_names_path.items():
-        # check required keys
-        required_keys = [
-            "pipeline",
-            "config",
-            "model_path",
-            "min_max_bands",
-            "min_max_label",
-            "split",
-        ]
-        missing = [k for k in required_keys if k not in paths]
-        if missing:
-            raise KeyError(f"Missing keys {missing} for model '{name}'")
-
-        # load JSON configs safely
-        def load_json(path: str | Path):
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-
-        # load pickle
-        with open(paths["pipeline"], "rb") as f:
-            pipeline = pickle_load(f)
-
-        models[name] = {
-            "config": load_json(paths["config"]),
-            "pipeline": pipeline,
-            "model_path": paths["model_path"],
-            "min_max_bands": load_json(paths["min_max_bands"]),
-            "min_max_label": load_json(paths["min_max_label"]),
-            "split": load_json(paths["split"]),
-        }
 
     return models
 

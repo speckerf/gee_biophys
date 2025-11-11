@@ -28,7 +28,7 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
         )
 
     elif cfg.variables.model == "s2biophys":
-        s2biophys_model_ensemble = load_model_ensemble("laie")
+        s2biophys_model_ensemble = load_model_ensemble(cfg.variables.variable)
 
         gee_preds = {}
         for i, (model_name, model) in enumerate(s2biophys_model_ensemble.items()):
@@ -38,7 +38,7 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
                 trait=cfg.variables.variable,
                 model_config=model.config,
                 min_max_bands=model.min_max_bands,
-                min_max_label=None,
+                clip_min_max=cfg.options.clip_min_max,
             )
 
         s2biophys_imgc_preds = reduce(

@@ -1,6 +1,6 @@
 import json
 from importlib.resources import files
-from typing import Literal
+from typing import Literal, Optional
 
 import ee
 import numpy as np
@@ -12,8 +12,6 @@ class LeafToolbox_MLPRegressor:
         self,
         net: dict,
         domain_codes: list = None,
-        clip_min_max: bool = False,
-        clip_trait: str | None = None,
     ) -> None:
         ### init original params
         # load params from json dict
@@ -57,21 +55,6 @@ class LeafToolbox_MLPRegressor:
         else:
             self.domain_codes = None
             logger.debug("SL2P init(): No domain codes for input validation provided")
-
-        if clip_min_max:
-            assert clip_trait in [
-                "lai",
-                "fapar",
-                "fcover",
-            ], "clip_trait must be one of 'lai', 'fapar', 'fcover'"
-            logger.debug(
-                "clip_min_max=True is set. Predictions will be clipped to: 0-8 for LAI and 0-1 for FAPAR/FCOVER.",
-            )
-            self.clip_min_max = True
-            self.clip_trait = clip_trait
-        else:
-            self.clip_min_max = False
-            self.clip_trait = None
 
     def _tansig(self, x):
         return 2.0 / (1.0 + np.exp(-2.0 * x)) - 1.0
@@ -124,7 +107,12 @@ class LeafToolbox_MLPRegressor:
         )
         return invalid_mask
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(
+        self,
+        X: np.ndarray,
+        clip_min_max: bool = False,
+        clip_variable: Optional[str] = None,
+    ) -> np.ndarray:
         """X: (n_samples, n_features)
         returns: (n_samples,)
         """
@@ -140,11 +128,16 @@ class LeafToolbox_MLPRegressor:
         # output scaling
         y = (h2 - self.out_bias) / self.out_slope
 
-        if self.clip_min_max:
-            if self.clip_trait == "lai":
+        if clip_min_max:
+            assert clip_variable is not None, (
+                "clip_variable must be provided when clip_min_max is True"
+            )
+            if clip_variable in ["lai", "laie"]:
                 y = np.clip(y, 0, 8)
-            elif self.clip_trait in ["fapar", "fcover"]:
+            elif clip_variable in ["fapar", "fcover"]:
                 y = np.clip(y, 0, 1)
+            else:
+                raise ValueError(f"Clipping not defined for variable: {clip_variable}")
         return y.ravel()
 
     def _tansig_ee(self, x: ee.Image) -> ee.Image:
@@ -154,7 +147,12 @@ class LeafToolbox_MLPRegressor:
             .subtract(ee.Image(1))
         )
 
-    def ee_predict(self, ee_img: ee.Image) -> ee.Image:
+    def ee_predict(
+        self,
+        ee_img: ee.Image,
+        clip_min_max: bool = False,
+        clip_variable: Optional[str] = None,
+    ) -> ee.Image:
         """Predict using an ee.Image as input.
         Returns an ee.Image with the prediction.
         """
@@ -181,10 +179,13 @@ class LeafToolbox_MLPRegressor:
             .divide(ee.Image(self.ee_out_slope))
         )
 
-        if self.clip_min_max:
-            if self.clip_trait == "lai":
+        if clip_min_max:
+            assert clip_variable is not None, (
+                "clip_variable must be provided when clip_min_max is True"
+            )
+            if clip_variable == "lai":
                 y = y.clamp(0, 8)
-            elif self.clip_trait in ["fapar", "fcover"]:
+            elif clip_variable in ["fapar", "fcover"]:
                 y = y.clamp(0, 1)
 
         return y.arrayFlatten([["output"]])

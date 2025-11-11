@@ -15,8 +15,8 @@ temporal:
     interval: quarterly
 
 variables:
-  model: sl2p                # options: s2biophys, sl2p
-  variable: fapar                  # options: laie, fapar, fcover
+  model: s2biophys                # options: s2biophys, sl2p
+  variable: fapar                 # options: laie, fapar, fcover
   bands: [mean, stdDev, count]    # allowed: mean, stdDev, count / bandnames will be {variable}_{band}
 
 export:
@@ -32,5 +32,6 @@ options:
   max_cloud_cover: 70             # 0..100 (uses S2 metadata if applicable)
   csplus_band: cs_cdf             # options: cs, cs_cdf
   cs_plus_threshold: 0.65         # 0.0..1.0 (higher = more conservative)
+  clip_min_max: true
 
 version: "v02"                    # corresponds to current s2biophys version, allows future changes
