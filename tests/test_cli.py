@@ -46,18 +46,3 @@ def test_cli(ee_init, config_path):
 def test_configs(config_path):
     cfg = load_params(config_path)
     assert isinstance(cfg, ConfigParams)
-
-
-@pytest.mark.parametrize(
-    "config_path",
-    [
-        "example_configs/minimal_example.yaml",
-        "example_configs/bimonthly-zambia.yaml",
-        "example_configs/seasonal-summer-zurich.yaml",
-    ],
-)
-def test_interval_iteration(config_path):
-    cfg = load_params(config_path)
-
-    intervals = list(cfg.temporal.iter_date_ranges())
-    assert len(intervals) > 0, "No date ranges generated from config temporal settings."

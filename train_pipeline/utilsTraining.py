@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from loguru import logger
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
@@ -30,8 +31,14 @@ class NIRvTransformer(BaseEstimator, TransformerMixin):
         # add random number to avoid division by zero
         X = X + np.abs(np.random.rand(*X.shape) * 1e-10)
 
-        NIR = X[["B8"]].values.reshape(-1)
-        RED = X[["B4"]].values.reshape(-1)
+        if isinstance(X, np.ndarray):
+            idx_nir = 6  # B8
+            idx_red = 2  # B4
+            NIR = X[:, idx_nir]
+            RED = X[:, idx_red]
+        elif isinstance(X, pd.DataFrame):
+            NIR = X[["B8"]].values.reshape(-1)
+            RED = X[["B4"]].values.reshape(-1)
 
         # check that NIR + RED is not 0
         if np.any(NIR + RED == 0):
