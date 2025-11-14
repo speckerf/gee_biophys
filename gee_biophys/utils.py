@@ -33,6 +33,11 @@ def get_system_index(
         f"{crs_str}_"
         f"{version_str}"
     )
+
+    assert len(index_str) <= 100, (
+        f"Generated system:index is too long ({len(index_str)} characters). {index_str} "
+        "Please use shorter names for region_name in the configuration."
+    )
     return index_str
 
 

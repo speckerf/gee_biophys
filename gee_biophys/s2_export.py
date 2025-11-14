@@ -18,7 +18,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         logger.debug(f"Exporting image to Asset: {asset_id}")
         task = ee.batch.Export.image.toAsset(
             image=image,
-            description=f"Export_{filename}",
+            description=filename,
             assetId=asset_id,
             region=cfg.spatial.ee_geometry,
             scale=cfg.export.scale,
@@ -34,7 +34,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         )
         task = ee.batch.Export.image.toDrive(
             image=image,
-            description=f"Export_{filename}",
+            description=filename,
             folder=cfg.export.folder,
             fileNamePrefix=filename,
             region=cfg.spatial.ee_geometry,
@@ -53,7 +53,7 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         )
         task = ee.batch.Export.image.toCloudStorage(
             image=image,
-            description=f"Export_{filename}",
+            description=filename,
             bucket=bucket,
             fileNamePrefix=f"{gcs_folder}/{filename}" if gcs_folder else filename,
             region=cfg.spatial.ee_geometry,
