@@ -41,8 +41,13 @@ def test_cli(ee_init, config_path):
         "example_configs/minimal_example.yaml",
         "example_configs/bimonthly-zambia.yaml",
         "example_configs/seasonal-summer-zurich.yaml",
+        "example_configs/forest-fire-bitsch-2023.yaml",
     ],
 )
 def test_configs(config_path):
     cfg = load_params(config_path)
+
+    if config_path == "example_configs/forest-fire-bitsch-2023.yaml":
+        assert cfg.export.crs == "EPSG:32632"  # ensure LOCAL_UTM is resolved
+
     assert isinstance(cfg, ConfigParams)

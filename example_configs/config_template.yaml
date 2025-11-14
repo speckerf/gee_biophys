@@ -50,7 +50,7 @@ export:
   # Common options
   project_id: "ee-yourproject"    # optional GEE project id for exports
   filename_prefix: "biophys"      # base name for export files
-  crs: "EPSG:4326"                # e.g., use UTM for regional accuracy (EPSG:32630, 32723, etc.)
+  crs: "EPSG:4326"                # e.g., use UTM for regional accuracy (EPSG:32630, 32723, etc.) / or specify LOCAL_UTM (automatic)
   scale: 100                      # meters per pixel (PositiveInt)
   max_pixels: 100_000_000_000     # e.g. default 1e11
 

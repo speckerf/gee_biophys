@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -370,7 +371,7 @@ class ExportOpts(BaseModel):
     # common
     project_id: str | None = None  # GEE project ID for exports
     filename_prefix: str = "biophys"
-    crs: str | None = None  # e.g. "EPSG:4326"
+    crs: str  # e.g. "EPSG:4326" / or specify LOCAL_UTM (automatic)
     scale: PositiveInt | None = None  # meters
     max_pixels: int = Field(default=100_000_000_000, ge=1)
 
@@ -379,10 +380,8 @@ class ExportOpts(BaseModel):
 
     @field_validator("crs")
     def check_epsg(cls, v):
-        if v is None:
-            return v
-        if not re.fullmatch(r"EPSG:\d{4,6}", v):
-            raise ValueError("crs must look like 'EPSG:4326'.")
+        if not (re.match(r"^EPSG:\d{4,5}$", v) or v == "LOCAL_UTM"):
+            raise ValueError("crs must look like 'EPSG:4326' or be 'LOCAL_UTM'.")
         return v
 
     @model_validator(mode="after")
@@ -404,6 +403,41 @@ class ExportOpts(BaseModel):
                     "When destination='gcs', 'folder' must be a string if provided.",
                 )
         return self
+
+
+def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
+    """
+    Returns the UTM EPSG code for a given latitude and longitude,
+    including special cases for Norway and Svalbard.
+    EPSG codes:
+        - Northern Hemisphere: 32601 to 32660
+        - Southern Hemisphere: 32701 to 32760
+    """
+    long_temp = lon
+    zone_number = math.floor((long_temp + 180) / 6) + 1
+
+    # Special case for Norway
+    if 56.0 <= lat < 64.0 and 3.0 <= long_temp < 12.0:
+        zone_number = 32
+
+    # Special zones for Svalbard
+    if 72.0 <= lat < 84.0:
+        if 0.0 <= long_temp < 9.0:
+            zone_number = 31
+        elif 9.0 <= long_temp < 21.0:
+            zone_number = 33
+        elif 21.0 <= long_temp < 33.0:
+            zone_number = 35
+        elif 33.0 <= long_temp < 42.0:
+            zone_number = 37
+
+    # Determine EPSG code
+    if lat >= 0:
+        epsg_code = 32600 + zone_number  # Northern hemisphere
+    else:
+        epsg_code = 32700 + zone_number  # Southern hemisphere
+
+    return epsg_code
 
 
 # ----------------- Variables -----------------
@@ -439,3 +473,30 @@ class ConfigParams(BaseModel):
     export: ExportOpts
     options: Options
     version: str = Field(default="v02", pattern=r"^v\d{2}$")
+
+    @model_validator(mode="after")
+    def initialize_ee(self):
+        """Initialize Earth Engine with the specified project ID, if provided."""
+        import ee
+
+        if self.export.project_id:
+            ee.Initialize(project=self.export.project_id)
+        else:
+            ee.Initialize()
+        return self
+
+    # if export.crs == "LOCAL_UTM", resolve to EPSG code based on spatial geometry and return updated instance
+    @model_validator(mode="after")
+    def export_crs_resolved(self):
+        if self.export.crs != "LOCAL_UTM":
+            return self  # Return self if no change is made
+
+        geom = self.spatial.ee_geometry
+        centroid = geom.centroid(1).coordinates().getInfo()
+        lon, lat = centroid[0], centroid[1]
+        epsg_code = _latlon_to_utm_epsg(lat, lon)
+
+        # **This line is necessary to persist the change**
+        self.export.crs = f"EPSG:{epsg_code}"
+
+        return self  # Return the updated instance

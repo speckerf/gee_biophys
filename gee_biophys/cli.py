@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import ee
 import typer
 import yaml
 from loguru import logger
@@ -43,9 +42,6 @@ app = typer.Typer(
 def run_pipeline(config: str):
     # <---- Setup ---->
     cfg = load_params(str(config))
-
-    # default initialization / or use designated service account
-    ee.Initialize(project=cfg.export.project_id)
 
     initialize_export_location(cfg)
 
@@ -94,5 +90,5 @@ def run(
 
 
 if __name__ == "__main__":
-    config_path = Path("example_configs/minimal_example.yaml")
+    config_path = Path("example_configs/forest-fire-bitsch-2023.yaml")
     run_pipeline(config_path)  # for debugging purposes
