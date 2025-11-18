@@ -24,7 +24,7 @@ options:
 export:
   project_id: ee-speckerfelix
   destination: asset # options: asset, drive, gcs
-  collection_path: projects/ee-speckerfelix/assets/custom-exports/forest-fire-ch-bitsch-cs # used if destination is asset
+  collection_path: projects/ee-speckerfelix/assets/custom-exports/forest-fire-ch-bitsch # used if destination is asset
   crs: LOCAL_UTM
   scale: 20
   max_pixels: 100_000_000_000 # 1e11
