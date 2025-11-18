@@ -55,9 +55,9 @@ export:
   max_pixels: 100_000_000_000     # e.g. default 1e11
 
 options:
-  max_cloud_cover: 70             # 0..100 (uses S2 metadata if applicable)
+  max_cloud_cover: 50             # 0..100 (uses S2 metadata CLOUDY_PIXEL_PERCENTAGE as first filter)
   csplus_band: cs                 # options: cs, cs_cdf: see https://medium.com/google-earth/all-clear-with-cloud-score-bd6ee2e2235e for details
-  cs_plus_threshold: 0.65         # 0.0..1.0 (higher = more conservative)
+  cs_plus_threshold: 0.70         # 0.0..1.0 (higher = more conservative)
   clip_min_max: true              # if true, clips predictions to (0, 1) for fapar and fcover, and (0, 8) for laie/lai
 
 version: "v02"                    # corresponds to current s2biophys version, allows future changes

@@ -456,9 +456,9 @@ class Variables(BaseModel):
 
 # ----------------- Options -----------------
 class Options(BaseModel):
-    max_cloud_cover: int = Field(default=70, ge=0, le=100)
+    max_cloud_cover: int = Field(default=50, ge=0, le=100)
     csplus_band: Literal["cs", "cs_cdf"] = "cs"
-    cs_plus_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
+    cs_plus_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
     clip_min_max: bool = True
 
     # Enforce that *no other keys* are accepted

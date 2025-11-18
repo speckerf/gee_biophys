@@ -16,9 +16,9 @@ variables:
   variable: fapar # laie, fapar, fcover
 
 options:
-  max_cloud_cover: 70 
+  max_cloud_cover: 50 
   csplus_band: 'cs' 
-  cs_plus_threshold: 0.65
+  cs_plus_threshold: 0.70
   clip_min_max: true
 
 export:
