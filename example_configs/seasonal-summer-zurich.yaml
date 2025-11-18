@@ -19,7 +19,7 @@ variables:
 
 options:
   max_cloud_cover: 70 
-  csplus_band: 'cs_cdf' # options: cs, cs_cdf (cloud score plus band)
+  csplus_band: 'cs'
   cs_plus_threshold: 0.65
   clip_min_max: true
 
