@@ -15,8 +15,7 @@ temporal:
 
 variables:
   model: s2biophys # options: s2biophys, sl2p
-  variable: laie # laie, fapar, fcover
-  bands: [mean, stdDev, count] 
+  variable: laie # laie, fapar, fcover 
 
 options:
   max_cloud_cover: 70 
@@ -30,6 +29,6 @@ export:
   collection_path: projects/ee-speckerfelix/assets/custom-exports/summer-zurich # used if destination is asset
   # folder: biophys_exports # used if destination is drive or gcs
   # bucket: your-gcs-bucket-name # used if destination is gcs
-  crs: EPSG:4326
+  crs: LOCAL_UTM
   scale: 100
   max_pixels: 100_000_000_000 # 1e11

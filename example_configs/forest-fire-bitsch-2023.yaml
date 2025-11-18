@@ -1,19 +1,20 @@
 spatial:
   type: bbox # options: bbox, geojson
-  bbox: [31.5, -13.0, 31.6, -12.9] # [minLon, minLat, maxLon, maxLat]
-  region_name: luangwa-zambia # no spaces, no underscores
+  bbox: [7.95, 46.3, 8.05, 46.4] # [minLon, minLat, maxLon, maxLat]
+  region_name: forest-fire-ch-bitsch # no spaces, no underscores
 
 temporal:
   start: "2019-01-01"
-  end:   "2025-01-01"
+  end:   "2025-11-01"
   cadence:
-    type: fixed
-    interval: bimonthly
+    type: seasons
+    start: "06-01"
+    end:   "08-31"
 
 variables:
   model: s2biophys # options: s2biophys, sl2p
-  variable: fcover # laie, fapar, fcover
-  
+  variable: fapar # laie, fapar, fcover
+
 options:
   max_cloud_cover: 70 
   csplus_band: 'cs_cdf' # options: cs, cs_cdf (cloud score plus band)
@@ -23,7 +24,7 @@ options:
 export:
   project_id: ee-speckerfelix
   destination: asset # options: asset, drive, gcs
-  collection_path: projects/ee-speckerfelix/assets/custom-exports/zambia-monthly # used if destination is asset
-  crs: EPSG:32736
+  collection_path: projects/ee-speckerfelix/assets/custom-exports/forest-fire-ch-bitsch # used if destination is asset
+  crs: LOCAL_UTM
   scale: 20
   max_pixels: 100_000_000_000 # 1e11

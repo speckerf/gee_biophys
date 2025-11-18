@@ -16,8 +16,7 @@ temporal:
 
 variables:
   model: s2biophys                # options: s2biophys, sl2p
-  variable: fapar                 # options: laie, fapar, fcover
-  bands: [mean, stdDev, count]    # allowed: mean, stdDev, count / bandnames will be {variable}_{band}
+  variable: laie                 # options: laie, fapar, fcover
 
 export:
   # Destination discriminator & required fields

@@ -46,8 +46,8 @@ Each export includes:
 Create a clean virtual environment (e.g. using conda or venv). *Recommended Python version 3.12*:
 
 ```bash
-conda create -n gee-biophys python=3.12
-conda activate gee-biophys
+conda create -n [ENV_NAME] python=3.12
+conda activate [ENV_NAME]
 pip install gee-biophys
 ```
 
@@ -56,9 +56,13 @@ pip install gee-biophys
 ### Alternative installation — Install from source
 
 ```bash
+conda create -n [ENV_NAME] python=3.12
+conda activate [ENV_NAME]
+
 git clone https://github.com/speckerf/gee_biophys.git
 cd gee_biophys
-uv pip install -e .
+
+pip install -e .
 ```
 
 ------
@@ -131,7 +135,7 @@ export:
   destination: asset
   collection_path: "projects/ee-speckerfelix/assets/custom-exports/test" # CHANGE
   project_id: "ee-speckerfelix" # CHANGE
-  crs: "EPSG:4326"
+  crs: "EPSG:4326" # EPSG code or LOCAL_UTM (automatic)
   scale: 100
   max_pixels: 100_000_000_000
 
@@ -153,14 +157,14 @@ A fully commented reference configuration file is available [here](https://githu
 
 ## Configuration Structure
 
-| Section     | Purpose                                              | Example                            |
-| ----------- | ---------------------------------------------------- | ---------------------------------- |
-| `spatial`   | Defines the area of interest (bbox or GeoJSON)       | `[minLon, minLat, maxLon, maxLat]` |
-| `temporal`  | Sets start/end dates and cadence (fixed or seasonal) | `quarterly`, `monthly`, `yearly`   |
-| `variables` | Selects the biophysical variable and retrieval model | `fapar`, `laie`, `fcover`          |
-| `export`    | Configures export target and GEE project             | e.g. `projects/ee-user/assets/...` |
-| `options`   | Controls cloud masking and thresholds                | max cloud cover, CS+ threshold     |
-| `version`   | Records model version for reproducibility            | `"v02"`                            |
+| Section     | Purpose                                                      | Example                            |
+| ----------- | ------------------------------------------------------------ | ---------------------------------- |
+| `spatial`   | Defines the area of interest (bbox or GeoJSON)               | `[minLon, minLat, maxLon, maxLat]` |
+| `temporal`  | Sets start/end dates and cadence (fixed or seasonal)         | `quarterly`, `monthly`, `yearly`   |
+| `variables` | Selects the biophysical variable and retrieval model         | `fapar`, `laie`, `fcover`          |
+| `export`    | Configures export target and GEE project, CRS, spatial resolution, etc. | e.g. `projects/ee-user/assets/...` |
+| `options`   | Controls cloud masking and thresholds                        | max cloud cover, CS+ threshold     |
+| `version`   | Records model version for reproducibility                    | `"v02"`                            |
 
 ---
 
@@ -189,16 +193,3 @@ Note that exports with the same *system:index* will fail when writing to Earth E
 If you use **gee-biophys** in your research, please cite the associated publication (forthcoming):
 
 > Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 01 April 2025, PREPRINT (Version 1) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v1]
-
-------
-
-## Project Information
-
-| Field                          | Description                                                  |
-| ------------------------------ | ------------------------------------------------------------ |
-| Recommended **Python version** | ≥ 3.12                                                       |
-| **Dependencies**               | `earthengine-api`, `pydantic`, `typer`, `pyyaml`, `loguru`, etc. |
-| **License**                    | MIT                                                          |
-| **Maintainer**                 | Felix Specker                                                |
-| **Repository**                 | [github.com//gee_biophys](https://github.com//gee_biophys)   |
-
