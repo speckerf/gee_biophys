@@ -91,15 +91,15 @@ run_pipeline(config='path_to_yaml.yaml')
 
 The tool will start an Earth Engine export task for each exported time period. So the temporal frequency and the total time window determine the number of export tasks to execute. 
 
-![image-20251111110226984](docs/img/image-20251111110226984.png)
+<img src="docs/img/image-20251111110226984.png" alt="image-20251111110226984" width="500"/>
 
 Check the progress of the exports in the code editor directly: 
 
-<img src="docs/img/image-20251111110601338.png" alt="image-20251111110601338" style="zoom:50%;" />
+<img src="docs/img/image-20251111110601338.png" alt="image-20251111110601338" width="400"/>
 
 ### Visualize results
 
-To visualize results, we provide here
+To visualize results, please use the following earth-engine app: [here](https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer)
 
 ------
 
@@ -129,7 +129,6 @@ temporal:
 variables:
   model: s2biophys
   variable: fapar
-  bands: [mean, stdDev, count]
 
 export:
   destination: asset
@@ -140,9 +139,9 @@ export:
   max_pixels: 100_000_000_000
 
 options:
-  max_cloud_cover: 70
-  csplus_band: cs_cdf
-  cs_plus_threshold: 0.65
+  max_cloud_cover: 50
+  csplus_band: cs
+  cs_plus_threshold: 0.70
 
 version: "v02"
 ```
@@ -165,6 +164,10 @@ A fully commented reference configuration file is available [here](https://githu
 | `export`    | Configures export target and GEE project, CRS, spatial resolution, etc. | e.g. `projects/ee-user/assets/...` |
 | `options`   | Controls cloud masking and thresholds                        | max cloud cover, CS+ threshold     |
 | `version`   | Records model version for reproducibility                    | `"v02"`                            |
+
+**Note:**
+If you want to find a good balance between strict cloud masking and having enough cloud-free pixels for analysis, you can use the following script to explore and tune the three key parameters—CloudScore+ band, CloudScore+ threshold, and maximum CLOUDY_PIXEL_PERCENTAGE from the Sentinel-2 metadata:
+https://code.earthengine.google.com/716bee247685008f34b49c63d32b8447
 
 ---
 
@@ -193,3 +196,4 @@ Note that exports with the same *system:index* will fail when writing to Earth E
 If you use **gee-biophys** in your research, please cite the associated publication (forthcoming):
 
 > Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 01 April 2025, PREPRINT (Version 1) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v1]
+
