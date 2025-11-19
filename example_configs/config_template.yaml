@@ -60,4 +60,4 @@ options:
   cs_plus_threshold: 0.70         # 0.0..1.0 (higher = more conservative)
   clip_min_max: true              # if true, clips predictions to (0, 1) for fapar and fcover, and (0, 8) for laie/lai
 
-version: "v02"                    # corresponds to current s2biophys version, allows future changes
+version: "v02"                    # corresponds to current s2biophys version (only v02 implemented), allows future changes

@@ -156,7 +156,20 @@ def asset_exists(asset_id: str) -> bool:
         return False
 
 
-def initialize_export_location(cfg: ConfigParams):
+def set_asset_public(asset_id: str):
+    """Sets a GEE asset to public read access."""
+    acl = ee.data.getAssetAcl(asset_id)
+
+    if "all_users_can_read" not in acl:
+        # add 'all_users_can_read': False
+        acl["all_users_can_read"] = True
+        ee.data.setAssetAcl(asset_id, acl)
+        logger.info(f"Set asset {asset_id} to public read access.")
+    else:
+        logger.info(f"Asset {asset_id} is already public.")
+
+
+def initialize_export_location(cfg: ConfigParams, set_public: bool = False) -> None:
     loc = cfg.export.destination
     if loc == "asset":
         if asset_exists(cfg.export.collection_path):
@@ -175,6 +188,18 @@ def initialize_export_location(cfg: ConfigParams):
                 cfg.export.collection_path,
                 {"config": cfg_string},
             )
+
+    if set_public:
+        if cfg.export.destination != "asset":
+            logger.warning(
+                "Public access can only be set for asset exports. Skipping setting public access.",
+            )
+        else:
+            logger.debug(
+                "Note: The exported imageCollection will be set to public access, such that it can be visualized using the GEE-App: https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer"
+            )
+            set_asset_public(cfg.export.collection_path)
+
     elif loc == "drive":
         logger.info(
             f"Assets will be exported to Google Drive folder: {cfg.export.folder}",

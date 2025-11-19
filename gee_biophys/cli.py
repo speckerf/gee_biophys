@@ -39,11 +39,12 @@ app = typer.Typer(
 )
 
 
-def run_pipeline(config: str):
+def run_pipeline(config: str, set_public: bool = False) -> None:
+    """Run the full export pipeline based on the provided configuration."""
     # <---- Setup ---->
     cfg = load_params(str(config))
 
-    initialize_export_location(cfg)
+    initialize_export_location(cfg, set_public=set_public)
 
     # <---- Main Loop ---->
     for interval_start, interval_end in cfg.temporal.iter_date_ranges():
@@ -83,12 +84,18 @@ def run(
         callback=validate_config,
         readable=True,
     ),
+    public: bool = typer.Option(
+        False,
+        "--public/--no-public",
+        help="Set exported file ACL to public after export. This is required if you want to visualize the exported asset using the GEE-App ",
+        show_default=True,
+    ),
 ):
     """CLI entry point"""
     typer.echo(f"Using configuration file: {config}")
-    run_pipeline(config)
+    run_pipeline(config, set_public=public)
 
 
 if __name__ == "__main__":
     config_path = Path("example_configs/forest-fire-bitsch-2023.yaml")
-    run_pipeline(config_path)  # for debugging purposes
+    run_pipeline(config_path, set_public=True)  # for debugging purposes

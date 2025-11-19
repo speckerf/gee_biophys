@@ -74,10 +74,11 @@ pip install -e .
 #### 1. Command-line interface
 
 ```bash
-gee-biophys --config path_to_yaml.yaml
+gee-biophys --config path_to_yaml.yaml (--public)
 ```
 
-The `--config` (or `-c`) argument is **required** and must point to a valid YAML configuration file.
+- The `--config` (or `-c`) argument is **required** and must point to a valid YAML configuration file.
+- The `--public` argument is **optional** and can be specified if the create `ImageCollection` should be public to all GEE-users.
 
 #### 2. Python interface
 
@@ -99,7 +100,8 @@ Check the progress of the exports in the code editor directly:
 
 ### Visualize results
 
-To visualize results, please use the following earth-engine app: [here](https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer)
+To visualize results, please use the following earth-engine app: [here](https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer). Note that this requires that the option `--public` was set when running `gee-biophys`. 
+Alternatively, the source code of the app can also be directly to visualize a non-public `ImageCollection`. 
 
 ------
 
@@ -142,6 +144,7 @@ options:
   max_cloud_cover: 50
   csplus_band: cs
   cs_plus_threshold: 0.70
+  clip_min_max: true # if true, clips predictions to (0, 1) for fapar and fcover, and (0, 8) for laie/lai
 
 version: "v02"
 ```

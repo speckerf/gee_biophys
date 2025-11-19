@@ -64,3 +64,4 @@ def export_image(image: ee.Image, filename: str, cfg: ConfigParams):
         task.start()
     else:
         raise ValueError(f"Unknown output_location: {loc}")
+        raise ValueError(f"Unknown output_location: {loc}")
