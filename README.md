@@ -92,11 +92,13 @@ run_pipeline(config='path_to_yaml.yaml')
 
 The tool will start an Earth Engine export task for each exported time period. So the temporal frequency and the total time window determine the number of export tasks to execute. 
 
-<img src="docs/img/image-20251111110226984.png" alt="image-20251111110226984" width="500"/>
+<img src="https://github.com/speckerf/gee_biophys/blob/4ace0229e9e58e2b9d41b159dc8d9ff55bafeb0f/docs/img/image-20251111110226984.png" width="500"/>
 
 Check the progress of the exports in the code editor directly: 
 
-<img src="docs/img/image-20251111110601338.png" alt="image-20251111110601338" width="400"/>
+<img src="https://github.com/speckerf/gee_biophys/blob/4ace0229e9e58e2b9d41b159dc8d9ff55bafeb0f/docs/img/image-20251111110601338.png" width="500"/>
+
+Alternatively, check progress directly using the logged task ID: `earthengine task info [TASK_ID]`
 
 ### Visualize results
 
