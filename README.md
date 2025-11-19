@@ -96,7 +96,7 @@ The tool will start an Earth Engine export task for each exported time period. S
 
 Check the progress of the exports in the code editor directly: 
 
-<img src="https://github.com/speckerf/gee_biophys/blob/4ace0229e9e58e2b9d41b159dc8d9ff55bafeb0f/docs/img/image-20251111110601338.png" width="500"/>
+<img src="https://raw.githubusercontent.com/speckerf/gee_biophys/4ace0229e9e58e2b9d41b159dc8d9ff55bafeb0f/docs/img/image-20251111110601338.png" width="500"/>
 
 Alternatively, check progress directly using the logged task ID: `earthengine task info [TASK_ID]`
 
