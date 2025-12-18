@@ -61,7 +61,6 @@ def eePipelinePredictMap(
     imgc: ee.ImageCollection,
     trait: str,
     model_config: dict,
-    clip_min_max: bool,
     min_max_bands: dict | None = None,
 ):
     # get the bands and angles
@@ -133,21 +132,6 @@ def eePipelinePredictMap(
         raise ValueError(
             f"Unknown target transformation: {model_config['transform_target']}",
         )
-
-    if clip_min_max:
-        clip_dict = {
-            "lai": (0, 8),
-            "laie": (0, 8),
-            "fapar": (0, 1),
-            "fcover": (0, 1),
-        }
-        if trait in clip_dict:
-            min_val, max_val = clip_dict[trait]
-            imgc = imgc.map(
-                lambda image: image.clamp(min_val, max_val).copyProperties(image),
-            )
-        else:
-            raise ValueError(f"Clipping not defined for trait: {trait}")
 
     return imgc
 

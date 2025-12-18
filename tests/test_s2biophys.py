@@ -69,7 +69,6 @@ def test_s2biophys_random_inputs(ee_init, variable):
                 trait=variable,
                 model_config=spec["config"],
                 min_max_bands=None,
-                clip_min_max=False,
             )
             # Use mosaic() in case the pipeline returns more than one tile
             pred_imgs.append(
