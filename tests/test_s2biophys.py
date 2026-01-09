@@ -11,7 +11,10 @@ N_SAMPLES = 10
 
 @pytest.mark.parametrize("variable", ["laie", "fapar", "fcover"])
 def test_s2biophys_random_inputs(ee_init, variable):
-    s2biophys_ensemble = load_model_ensemble(variable)
+    (
+        s2biophys_ensemble,
+        (uncertainty_calibration_model, uncertainty_calibration_table),
+    ) = load_model_ensemble(variable)
 
     rng = np.random.default_rng(123)
     band_order = [

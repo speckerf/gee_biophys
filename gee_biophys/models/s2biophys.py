@@ -1,4 +1,5 @@
 import json
+import warnings
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -289,12 +290,14 @@ def eePipelinePredictMap(
       with `eeEnsemblePredictSingleImg` when using the same model weights
       and inputs.
     """
-    raise DeprecationWarning(
+    warnings.warn(
         "eePipelinePredictMapDeprecated is deprecated. It is only kept for testing purposes. "
         "Predictions should be done via eeEnsemblePredictSingleImg instead. "
         "However it still loads the same model as eeEnsemblePredictSingleImg and thus "
         "represents a valid test to test model consistency between local sklearn "
         "predictions and server-side GEE predictions.",
+        DeprecationWarning,
+        stacklevel=2,
     )
 
     # get the bands and angles
