@@ -5,7 +5,7 @@ import ee
 from loguru import logger
 
 from gee_biophys.config import ConfigParams
-from gee_biophys.models.s2biophys import prepare_s2_input_for_specker
+from gee_biophys.models.s2biophys import prepare_s2_input_for_s2biophys
 from gee_biophys.models.sl2p import prepare_s2_input_for_sl2p
 
 
@@ -149,7 +149,7 @@ def load_s2_input(
     if cfg.variables.model == "sl2p":
         s2_imgc = s2_imgc.map(prepare_s2_input_for_sl2p)
     elif cfg.variables.model == "s2biophys":
-        s2_imgc = s2_imgc.map(prepare_s2_input_for_specker)
+        s2_imgc = s2_imgc.map(prepare_s2_input_for_s2biophys)
     else:
         raise ValueError(f"Unsupported model '{cfg.variables.model}'")
 

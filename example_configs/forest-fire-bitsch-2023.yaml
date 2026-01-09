@@ -13,7 +13,8 @@ temporal:
 
 variables:
   model: s2biophys # options: s2biophys, sl2p
-  variable: fapar # laie, fapar, fcover
+  variable: laie # laie, fapar, fcover
+  bands: [mean, stdDev, stdDev_within, stdDev_across, count]    # allowed: mean, stdDev, stdDev_within, stdDev_across, count / bandnames will be {variable}_{band} / by default (recommended): [mean, stdDev, stdDev_within, stdDev_across, count]
 
 options:
   max_cloud_cover: 50 

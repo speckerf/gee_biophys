@@ -444,7 +444,9 @@ def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
 class Variables(BaseModel):
     model: Literal["s2biophys", "sl2p"] = "s2biophys"
     variable: Literal["laie", "fapar", "fcover"] = "laie"
-    bands: list[Literal["mean", "stdDev", "count"]] = ["mean", "stdDev", "count"]
+    bands: list[
+        Literal["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
+    ] = ["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
 
     # Enforce that *no other keys* are accepted
     model_config = ConfigDict(extra="forbid")

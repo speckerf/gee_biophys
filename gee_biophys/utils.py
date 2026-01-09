@@ -12,7 +12,6 @@ def get_system_index(
     interval_start: datetime,
     interval_end: datetime,
 ) -> str:
-    band_suffix = "-".join(cfg.variables.bands)
     output_resolution = cfg.export.scale
     start_str = interval_start.strftime("%Y%m%d")
     end_str = interval_end.strftime("%Y%m%d")
@@ -25,7 +24,6 @@ def get_system_index(
     index_str = (
         f"{cfg.variables.variable}_"
         f"{cfg.variables.model}_"
-        f"{band_suffix}_"
         f"{output_resolution}m_s_"
         f"{start_str}_"
         f"{end_str}_"
@@ -188,18 +186,6 @@ def initialize_export_location(cfg: ConfigParams, set_public: bool = False) -> N
                 cfg.export.collection_path,
                 {"config": cfg_string},
             )
-
-    if set_public:
-        if cfg.export.destination != "asset":
-            logger.warning(
-                "Public access can only be set for asset exports. Skipping setting public access.",
-            )
-        else:
-            logger.debug(
-                "Note: The exported imageCollection will be set to public access, such that it can be visualized using the GEE-App: https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer"
-            )
-            set_asset_public(cfg.export.collection_path)
-
     elif loc == "drive":
         logger.info(
             f"Assets will be exported to Google Drive folder: {cfg.export.folder}",
@@ -211,3 +197,14 @@ def initialize_export_location(cfg: ConfigParams, set_public: bool = False) -> N
         )
     else:
         raise ValueError(f"Unknown output_location: {loc}")
+
+    if set_public:
+        if cfg.export.destination != "asset":
+            logger.warning(
+                "Public access can only be set for asset exports. Skipping setting public access.",
+            )
+        else:
+            logger.debug(
+                "Note: The exported imageCollection will be set to public access, such that it can be visualized using the GEE-App: https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer"
+            )
+            set_asset_public(cfg.export.collection_path)

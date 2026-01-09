@@ -1,13 +1,14 @@
-from functools import reduce
-
 import ee
 
 from gee_biophys.config import ConfigParams
-from gee_biophys.models.s2biophys import eePipelinePredictMap, load_model_ensemble
+from gee_biophys.models.s2biophys import (
+    eeEnsemblePredictSingleImg,
+    load_model_ensemble,
+)
 from gee_biophys.models.sl2p import load_SL2P_model
 from gee_biophys.utils_predict import (
     aggregate_ensemble_predictions,
-    aggregate_imagecollection_simple,
+    reduce_ensemble_preds,
 )
 
 
@@ -32,28 +33,32 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
         output_image = output_image.updateMask(water_mask_2020.neq(80))
 
     elif cfg.variables.model == "s2biophys":
-        s2biophys_model_ensemble = load_model_ensemble(cfg.variables.variable)
+        (
+            s2biophys_model_ensemble,
+            (uncertainty_calibration_model, uncertainty_calibration_table),
+        ) = load_model_ensemble(cfg.variables.variable)
 
-        gee_preds = {}
-        for i, (model_name, model) in enumerate(s2biophys_model_ensemble.items()):
-            gee_preds[model_name] = eePipelinePredictMap(
-                pipeline=model.pipeline,
-                imgc=input_imgc,
-                trait=cfg.variables.variable,
-                model_config=model.config,
-                min_max_bands=model.min_max_bands,
+        imgc_preds = input_imgc.map(
+            lambda img: eeEnsemblePredictSingleImg(
+                ensemble=s2biophys_model_ensemble,
+                img=img,
+                variable=cfg.variables.variable,
+                calibrate_uncertainty=True,
+                uncertainty_calibration_table=uncertainty_calibration_table,
             )
-
-        s2biophys_imgc_preds = reduce(
-            lambda x, y: x.merge(y),
-            gee_preds.values(),
         )
 
-        output_image = aggregate_imagecollection_simple(
-            s2biophys_imgc_preds,
+        # b = eeEnsemblePredictSingleImg(
+        #     s2biophys_model_ensemble,
+        #     input_imgc.first(),
+        #     cfg.variables.variable,
+        #     calibrate_uncertainty=False,
+        # )
+
+        # reduce to mean / stdDev_across-images / stdDev_within-images per group
+        output_image = reduce_ensemble_preds(
+            imgc_preds,
             cfg.variables.variable,
-            replications=len(s2biophys_model_ensemble),
-            clip_min_max=cfg.options.clip_min_max,
         )
 
         water_mask_2020 = ee.ImageCollection("ESA/WorldCover/v200").first()

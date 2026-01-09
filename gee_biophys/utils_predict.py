@@ -1,6 +1,66 @@
 import ee
 
 
+def reduce_ensemble_preds(imgc_preds: ee.ImageCollection, variable: str) -> ee.Image:
+    """
+    Reduce an ImageCollection of per-image prediction outputs to summary bands.
+
+    Expects per-image bands:
+      - f"{variable}_mean"
+      - f"{variable}_stdDev"   (within-image predictive uncertainty, per image)
+
+    Returns an ee.Image with bands:
+      - f"{variable}_mean"
+      - f"{variable}_count"
+      - f"{variable}_stdDev_within"
+      - f"{variable}_stdDev_across"
+      - f"{variable}_stdDev"  (total)
+    """
+    b_mean = f"{variable}_mean"
+    b_sd = f"{variable}_stdDev"
+
+    # Mean prediction across images
+    preds_mean = imgc_preds.select(b_mean).mean().rename(b_mean)
+
+    # Count of valid observations (per pixel)
+    preds_count = (
+        imgc_preds.select(b_mean).reduce(ee.Reducer.count()).rename(f"{variable}_count")
+    )
+
+    # "Within" uncertainty: average per-image stdDev
+    preds_stdDev_within = (
+        imgc_preds.select(b_sd).mean().rename(f"{variable}_stdDev_within")
+    )
+
+    # "Across" uncertainty: sample std dev across per-image means
+    # (unmask for stable math, but mask back to within-mask to avoid inventing coverage)
+    preds_stdDev_across = (
+        imgc_preds.select(b_mean)
+        .reduce(ee.Reducer.sampleStdDev())
+        .unmask(0)
+        .updateMask(preds_stdDev_within.mask())
+        .rename(f"{variable}_stdDev_across")
+    )
+
+    # Total uncertainty: sqrt(within^2 + across^2)
+    preds_stdDev_total = (
+        preds_stdDev_across.pow(2)
+        .add(preds_stdDev_within.pow(2))
+        .sqrt()
+        .rename(f"{variable}_stdDev")
+    )
+
+    return ee.Image.cat(
+        [
+            preds_mean,
+            preds_stdDev_total,
+            preds_stdDev_within,
+            preds_stdDev_across,
+            preds_count,
+        ]
+    )
+
+
 def aggregate_imagecollection_simple(
     imgc: ee.ImageCollection,
     trait_name: str,
@@ -86,4 +146,5 @@ def aggregate_ensemble_predictions(
 
     img_counts = mean_imgc.count().rename(count_name)
     img_to_return = ee.Image([img_mean, img_total_std, img_counts])
+    return img_to_return
     return img_to_return
