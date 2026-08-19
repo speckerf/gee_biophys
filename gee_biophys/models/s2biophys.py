@@ -291,7 +291,7 @@ def eePipelinePredictMap(
       and inputs.
     """
     warnings.warn(
-        "eePipelinePredictMapDeprecated is deprecated. It is only kept for testing purposes. "
+        "eePipelinePredictMap is deprecated. It is only kept for testing purposes. "
         "Predictions should be done via eeEnsemblePredictSingleImg instead. "
         "However it still loads the same model as eeEnsemblePredictSingleImg and thus "
         "represents a valid test to test model consistency between local sklearn "

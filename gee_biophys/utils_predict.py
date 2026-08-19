@@ -147,4 +147,3 @@ def aggregate_ensemble_predictions(
     img_counts = mean_imgc.count().rename(count_name)
     img_to_return = ee.Image([img_mean, img_total_std, img_counts])
     return img_to_return
-    return img_to_return

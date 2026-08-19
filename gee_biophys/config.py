@@ -163,6 +163,7 @@ class FixedCadence(BaseModel):
             "quarterly",
             "yearly",
             "annual",
+            "dekadal",
         ]
     )
 
@@ -255,6 +256,40 @@ class Temporal(BaseModel):
             return
 
         name = c.interval
+        if name == "dekadal":
+            month_cursor = datetime(self.start.year, self.start.month, 1, tzinfo=UTC)
+            while month_cursor < self.end:
+                next_month = (
+                    datetime(month_cursor.year + 1, 1, 1, tzinfo=UTC)
+                    if month_cursor.month == 12
+                    else datetime(
+                        month_cursor.year, month_cursor.month + 1, 1, tzinfo=UTC
+                    )
+                )
+                month_last_day = (next_month - timedelta(days=1)).day
+                month_end = datetime(
+                    month_cursor.year,
+                    month_cursor.month,
+                    month_last_day,
+                    tzinfo=UTC,
+                )
+                month_end_exclusive = month_end + timedelta(days=1)
+                boundaries = [
+                    month_cursor,
+                    month_cursor + timedelta(days=10),
+                    month_cursor + timedelta(days=20),
+                    month_end_exclusive,
+                ]
+
+                for start_dt, end_dt in zip(boundaries[:-1], boundaries[1:]):
+                    clipped_start = max(start_dt, self.start)
+                    clipped_end = min(end_dt, self.end)
+                    if clipped_start < clipped_end:
+                        yield (clipped_start, clipped_end)
+
+                month_cursor = next_month
+            return
+
         if name in {"weekly", "biweekly"}:
             step = timedelta(days=7 if name == "weekly" else 14)
             t0 = self.start
@@ -361,7 +396,7 @@ class Temporal(BaseModel):
 # ----------------- Export options -----------------
 class ExportOpts(BaseModel):
     # only allow these three
-    destination: Literal["asset", "drive", "gcs"]
+    destination: Literal["asset", "drive", "gcs", "xee-local"]
 
     # destination-specific
     collection_path: str | None = None  # required if asset
@@ -401,6 +436,11 @@ class ExportOpts(BaseModel):
             if self.folder is not None and not isinstance(self.folder, str):
                 raise ValueError(
                     "When destination='gcs', 'folder' must be a string if provided.",
+                )
+        elif self.destination == "xee-local":
+            if not self.folder:
+                raise ValueError(
+                    "When destination='xee-local', 'folder' must be provided.",
                 )
         return self
 
@@ -481,10 +521,15 @@ class ConfigParams(BaseModel):
         """Initialize Earth Engine with the specified project ID, if provided."""
         import ee
 
+        kwargs = {}
+
         if self.export.project_id:
-            ee.Initialize(project=self.export.project_id)
-        else:
-            ee.Initialize()
+            kwargs["project"] = self.export.project_id
+
+        if self.export.destination == "xee-local":
+            kwargs["opt_url"] = "https://earthengine-highvolume.googleapis.com"
+
+        ee.Initialize(**kwargs)
         return self
 
     # if export.crs == "LOCAL_UTM", resolve to EPSG code based on spatial geometry and return updated instance

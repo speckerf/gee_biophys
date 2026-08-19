@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Literal
 
 import ee
+import shapely.geometry
 from loguru import logger
 
 from gee_biophys.config import ConfigParams
@@ -154,6 +155,44 @@ def load_s2_input(
         raise ValueError(f"Unsupported model '{cfg.variables.model}'")
 
     return s2_imgc
+
+
+def load_s2_input_xarray(
+    cfg: ConfigParams,
+    s2_imgc: ee.ImageCollection,
+):
+    """Open a prepared Sentinel-2 ImageCollection as an xarray dataset via xee.
+
+    This helper expects an ImageCollection that is already cloud-masked and model-prepared
+    through ``load_s2_input``.
+    """
+    import xarray as xr
+    import xee
+
+    source_params = xee.helpers.extract_grid_params(s2_imgc)
+    source_crs = source_params["crs"]
+    source_scale = (cfg.export.scale, -cfg.export.scale)
+
+    if cfg.spatial.type == "bbox":
+        aoi = shapely.geometry.box(*cfg.spatial.bbox)
+    else:
+        bounds_coords = cfg.spatial.ee_geometry.bounds(1).coordinates().getInfo()[0]
+        lons = [coord[0] for coord in bounds_coords]
+        lats = [coord[1] for coord in bounds_coords]
+        aoi = shapely.geometry.box(min(lons), min(lats), max(lons), max(lats))
+
+    grid_params = xee.helpers.fit_geometry(
+        geometry=aoi,
+        geometry_crs="EPSG:4326",
+        grid_crs=source_crs,
+        grid_scale=source_scale,
+    )
+
+    return xr.open_dataset(
+        s2_imgc,
+        engine="ee",
+        **grid_params,
+    )
 
 
 # if __name__ == "__main__":

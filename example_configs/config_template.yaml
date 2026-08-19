@@ -20,7 +20,8 @@ temporal:
     type: fixed                   # options: fixed, seasons
     # For 'fixed':
     # - Use an int for N-day steps (e.g., 16), OR one of:
-    #   weekly | biweekly | monthly | bimonthly | quarterly | yearly (alias: annual)
+    #   weekly | biweekly | monthly | bimonthly | quarterly | yearly (alias: annual) | dekadal
+    #   dekadal is a 10-day cadence that resets every month: 1-10, 11-20, 21-end-of-month
     interval: quarterly
 
     # If you instead want seasonal windows (cross-year allowed), use:
@@ -35,7 +36,7 @@ variables:
 
 export:
   # Destination discriminator & required fields
-  destination: asset              # options: asset, drive, gcs
+  destination: asset              # options: asset, drive, gcs, xee-local
 
   # If destination == 'asset' (REQUIRED):
   collection_path: "projects/ee-yourproject/assets/custom-exports/test"
@@ -46,6 +47,10 @@ export:
   # If destination == 'gcs'  (REQUIRED):
   # bucket: "your-gcs-bucket-name"
   # folder: "biophys_exports"     # optional object prefix for GCS
+
+  # If destination == 'xee-local' (REQUIRED):
+  # folder: "/path/to/local/folder"  # local folder for exports
+  # Note: xee-local is a local export option that uses the xee library to download files from GEE to your local machine. It requires xee to be installed and configured. For very large exports, this is not recommended; use server-side predictions instead. 
 
   # Common options
   project_id: "ee-yourproject"    # optional GEE project id for exports

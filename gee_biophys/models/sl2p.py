@@ -29,18 +29,15 @@ class LeafToolbox_MLPRegressor:
         self.bandorder = net["bandorder"]
 
         ### init ee params
-        self.ee_inp_slope = ee.Array(self.inp_slope.tolist())
-        self.ee_inp_offset = ee.Array(self.inp_offset.tolist())
-        self.ee_h1wt = ee.Array(
-            self.h1wt.tolist(),
-        ).transpose()  # its crucial to use transpose instead of reshape here!! (otherwise values fit into wrong positions)
-
-        self.ee_h1bi = ee.Array(self.h1bi.tolist()).reshape([1, -1])
-        self.ee_h2wt = ee.Array(self.h2wt.tolist()).transpose()
-
-        self.ee_h2bi = ee.Array(self.h2bi.tolist()).reshape([1, -1])
-        self.ee_out_slope = ee.Array(self.out_slope.tolist())
-        self.ee_out_bias = ee.Array(self.out_bias.tolist())
+        self.ee_inp_slope = None
+        self.ee_inp_offset = None
+        self.ee_h1wt = None
+        self.ee_h1bi = None
+        self.ee_h2wt = None
+        self.ee_h2bi = None
+        self.ee_out_slope = None
+        self.ee_out_bias = None
+        self._ensure_ee_arrays_initialized()
 
         logger.debug(
             f"SL2P init(): Make sure that the input data is ordered as in bandorder: {self.bandorder}",
@@ -58,6 +55,28 @@ class LeafToolbox_MLPRegressor:
 
     def _tansig(self, x):
         return 2.0 / (1.0 + np.exp(-2.0 * x)) - 1.0
+
+    def _ensure_ee_arrays_initialized(self) -> None:
+        if self.ee_inp_slope is not None:
+            return
+
+        try:
+            self.ee_inp_slope = ee.Array(self.inp_slope.tolist())
+            self.ee_inp_offset = ee.Array(self.inp_offset.tolist())
+            self.ee_h1wt = ee.Array(
+                self.h1wt.tolist(),
+            ).transpose()  # its crucial to use transpose instead of reshape here!! (otherwise values fit into wrong positions)
+
+            self.ee_h1bi = ee.Array(self.h1bi.tolist()).reshape([1, -1])
+            self.ee_h2wt = ee.Array(self.h2wt.tolist()).transpose()
+
+            self.ee_h2bi = ee.Array(self.h2bi.tolist()).reshape([1, -1])
+            self.ee_out_slope = ee.Array(self.out_slope.tolist())
+            self.ee_out_bias = ee.Array(self.out_bias.tolist())
+        except ee.EEException:
+            logger.debug(
+                "Earth Engine not initialized during SL2P model load; EE arrays will be initialized lazily when ee_predict is used.",
+            )
 
     def init_domain_codes(self):
         raise NotImplementedError("Domain code initialization not implemented yet.")
@@ -158,6 +177,12 @@ class LeafToolbox_MLPRegressor:
         """
         # TODO: check function carefully!!!!!!! - Copilot generated
         # Add test case that predict() and ee_predict() give same results on same data
+
+        self._ensure_ee_arrays_initialized()
+        if self.ee_inp_slope is None:
+            raise ee.EEException(
+                "Earth Engine arrays are not initialized. Ensure ee.Initialize() was called before ee_predict()."
+            )
 
         x = ee_img.toArray()
         x = x.multiply(ee.Image(self.ee_inp_slope)).add(ee.Image(self.ee_inp_offset))
