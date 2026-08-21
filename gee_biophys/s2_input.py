@@ -2,11 +2,10 @@ from datetime import datetime
 from typing import Literal
 
 import ee
+import shapely.geometry
 from loguru import logger
 
 from gee_biophys.config import ConfigParams
-from gee_biophys.models.s2biophys import prepare_s2_input_for_s2biophys
-from gee_biophys.models.sl2p import prepare_s2_input_for_sl2p
 
 
 def get_s2_imgc(
@@ -14,7 +13,7 @@ def get_s2_imgc(
     end_date: datetime,
     region: ee.Geometry,
     max_cloud_cover: int,
-    bands: list = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"],
+    bands: list[str],
 ) -> ee.ImageCollection:
     """Retrieve Sentinel-2 image collection for the specified date range and region,
     selecting only the specified bands.
@@ -129,13 +128,29 @@ def load_s2_input(
     interval_end: datetime,
 ) -> ee.ImageCollection:
     """Load and prepare Sentinel-2 ImageCollection based on configuration parameters."""
+    bands = [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6",
+        "B7",
+        "B8",
+        "B8A",
+        "B9",
+        "B11",
+        "B12",
+    ]
+
     s2_imgc = get_s2_imgc(
         start_date=interval_start,
         end_date=interval_end,
         region=cfg.spatial.ee_geometry,
         max_cloud_cover=cfg.options.max_cloud_cover,
+        bands=bands,
     )
-    logger.debug(f"Input S2 ImageCollection size: {s2_imgc.size().getInfo()}")
+    # logger.debug(f"Input S2 ImageCollection size: {s2_imgc.size().getInfo()}")
 
     s2_imgc = apply_cloudscore_plus_mask(
         s2_imgc,
@@ -146,29 +161,67 @@ def load_s2_input(
     # Add angles from metadata to bands
     s2_imgc = s2_imgc.map(add_angles_from_metadata_to_bands)
 
-    if cfg.variables.model == "sl2p":
-        s2_imgc = s2_imgc.map(prepare_s2_input_for_sl2p)
-    elif cfg.variables.model == "s2biophys":
-        s2_imgc = s2_imgc.map(prepare_s2_input_for_s2biophys)
+    return s2_imgc.set(
+        {
+            "system:time_start": int(interval_start.timestamp() * 1000),
+            "system:time_end": int(interval_end.timestamp() * 1000),
+        },
+    )
+
+
+def convert_s2_input_to_xarray(
+    cfg: ConfigParams,
+    s2_imgc: ee.ImageCollection,
+):
+    """Convert a Sentinel-2 ImageCollection to an xarray Dataset.
+
+    This helper expects an ImageCollection that is already cloud-masked and model-prepared
+    through ``load_s2_input``.
+    """
+    import xarray as xr
+    import xee
+
+    source_params = xee.helpers.extract_grid_params(s2_imgc)
+    source_crs = source_params["crs"]
+    source_scale = (cfg.export.scale, -cfg.export.scale)
+
+    if cfg.spatial.type == "bbox":
+        aoi = shapely.geometry.box(*cfg.spatial.bbox)
     else:
-        raise ValueError(f"Unsupported model '{cfg.variables.model}'")
+        bounds_coords = cfg.spatial.ee_geometry.bounds(1).coordinates().getInfo()[0]
+        lons = [coord[0] for coord in bounds_coords]
+        lats = [coord[1] for coord in bounds_coords]
+        aoi = shapely.geometry.box(min(lons), min(lats), max(lons), max(lats))
 
-    return s2_imgc
+    grid_params = xee.helpers.fit_geometry(
+        geometry=aoi,
+        geometry_crs="EPSG:4326",
+        grid_crs=source_crs,
+        grid_scale=source_scale,
+    )
 
+    if cfg.options.prediction_mode == "composite_then_predict":
+        logger.debug(
+            "Prediction mode is 'composite_then_predict': compositing ImageCollection to median image before loading as xarray.",
+        )
+        s2_imgc = ee.ImageCollection(
+            [
+                s2_imgc.median().set(
+                    "system:time_start",
+                    s2_imgc.get("system:time_start"),
+                    "system:time_end",
+                    s2_imgc.get("system:time_end"),
+                )
+            ]
+        ).set(
+            "system:time_start",
+            s2_imgc.get("system:time_start"),
+            "system:time_end",
+            s2_imgc.get("system:time_end"),
+        )
 
-# if __name__ == "__main__":
-#     ee.Initialize()
-
-#     start = datetime(2023, 6, 1)
-#     end = datetime(2023, 6, 30)
-#     region = ee.Geometry.Point([-122.262, 37.8719]).buffer(10000)  # 10 km buffer
-
-#     bands = ["B4", "B3", "B2"]  # Red, Green, Blue bands
-
-#     s2_imgc = get_s2_imgc(start, end, region, bands, max_cloud_cover=50)
-#     print(f"Original ImageCollection size: {s2_imgc.size().getInfo()}")
-
-#     s2_imgc_masked = apply_cloudscore_plus_mask(
-#         s2_imgc, csplus_band="cs", csplus_threshold=0.7
-#     )
-#     print(f"Masked ImageCollection size: {s2_imgc_masked.size().getInfo()}")
+    return xr.open_dataset(
+        s2_imgc,
+        engine="ee",
+        **grid_params,
+    )

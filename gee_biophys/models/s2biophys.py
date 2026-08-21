@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 import ee
 import numpy as np
 import pandas as pd
+import xarray as xr
 from sklearn.pipeline import Pipeline
 
 from gee_biophys.models.utils_s2biophys import (
@@ -291,7 +292,7 @@ def eePipelinePredictMap(
       and inputs.
     """
     warnings.warn(
-        "eePipelinePredictMapDeprecated is deprecated. It is only kept for testing purposes. "
+        "eePipelinePredictMap is deprecated. It is only kept for testing purposes. "
         "Predictions should be done via eeEnsemblePredictSingleImg instead. "
         "However it still loads the same model as eeEnsemblePredictSingleImg and thus "
         "represents a valid test to test model consistency between local sklearn "
@@ -466,17 +467,11 @@ def load_model_ensemble(
     return models, (calibration_model, calibration_table)  # type: ignore
 
 
-def prepare_s2_input_for_s2biophys(img: ee.Image) -> ee.Image:
-    """Prepare Sentinel-2 image for S2Biophys model prediction by selecting and ordering bands.
+def prepare_s2_img_for_s2biophys(img: ee.Image) -> ee.Image:
+    """Prepare one Sentinel-2 image for S2BIOPHYS model prediction.
 
-    Parameters
-    ----------
-    - img (ee.Image): Input Sentinel-2 image with bands.
-
-    Returns
-    -------
-    - ee.Image: Image with bands ordered as required by S2Biophys model.
-
+    Selects and orders the Sentinel-2 bands and angles required by
+    the S2BIOPHYS models.
     """
     bands = [
         "B2",
@@ -491,7 +486,33 @@ def prepare_s2_input_for_s2biophys(img: ee.Image) -> ee.Image:
         "B12",
     ]
     angles = ["tts", "tto", "psi"]
-    # reorder bands
-    band_order_reorder = bands + angles
 
-    return img.select(band_order_reorder)
+    return img.select(bands + angles).copyProperties(img, img.propertyNames())
+
+
+def prepare_s2_imgc_for_s2biophys(
+    imgc: ee.ImageCollection,
+) -> ee.ImageCollection:
+    """Prepare a Sentinel-2 ImageCollection for S2BIOPHYS model prediction."""
+    return imgc.map(prepare_s2_img_for_s2biophys)
+
+
+def prepare_s2_ds_for_s2biophys(
+    ds: xr.Dataset,
+) -> xr.Dataset:
+    """Prepare a local Sentinel-2 xarray Dataset for S2BIOPHYS model prediction."""
+    bands = [
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6",
+        "B7",
+        "B8",
+        "B8A",
+        "B11",
+        "B12",
+    ]
+    angles = ["tts", "tto", "psi"]
+
+    return ds[bands + angles]

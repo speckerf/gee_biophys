@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import ee
 import numpy as np
+import xarray as xr
 from loguru import logger
 
 
@@ -29,18 +30,15 @@ class LeafToolbox_MLPRegressor:
         self.bandorder = net["bandorder"]
 
         ### init ee params
-        self.ee_inp_slope = ee.Array(self.inp_slope.tolist())
-        self.ee_inp_offset = ee.Array(self.inp_offset.tolist())
-        self.ee_h1wt = ee.Array(
-            self.h1wt.tolist(),
-        ).transpose()  # its crucial to use transpose instead of reshape here!! (otherwise values fit into wrong positions)
-
-        self.ee_h1bi = ee.Array(self.h1bi.tolist()).reshape([1, -1])
-        self.ee_h2wt = ee.Array(self.h2wt.tolist()).transpose()
-
-        self.ee_h2bi = ee.Array(self.h2bi.tolist()).reshape([1, -1])
-        self.ee_out_slope = ee.Array(self.out_slope.tolist())
-        self.ee_out_bias = ee.Array(self.out_bias.tolist())
+        self.ee_inp_slope = None
+        self.ee_inp_offset = None
+        self.ee_h1wt = None
+        self.ee_h1bi = None
+        self.ee_h2wt = None
+        self.ee_h2bi = None
+        self.ee_out_slope = None
+        self.ee_out_bias = None
+        self._ensure_ee_arrays_initialized()
 
         logger.debug(
             f"SL2P init(): Make sure that the input data is ordered as in bandorder: {self.bandorder}",
@@ -58,6 +56,28 @@ class LeafToolbox_MLPRegressor:
 
     def _tansig(self, x):
         return 2.0 / (1.0 + np.exp(-2.0 * x)) - 1.0
+
+    def _ensure_ee_arrays_initialized(self) -> None:
+        if self.ee_inp_slope is not None:
+            return
+
+        try:
+            self.ee_inp_slope = ee.Array(self.inp_slope.tolist())
+            self.ee_inp_offset = ee.Array(self.inp_offset.tolist())
+            self.ee_h1wt = ee.Array(
+                self.h1wt.tolist(),
+            ).transpose()  # its crucial to use transpose instead of reshape here!! (otherwise values fit into wrong positions)
+
+            self.ee_h1bi = ee.Array(self.h1bi.tolist()).reshape([1, -1])
+            self.ee_h2wt = ee.Array(self.h2wt.tolist()).transpose()
+
+            self.ee_h2bi = ee.Array(self.h2bi.tolist()).reshape([1, -1])
+            self.ee_out_slope = ee.Array(self.out_slope.tolist())
+            self.ee_out_bias = ee.Array(self.out_bias.tolist())
+        except ee.EEException:
+            logger.debug(
+                "Earth Engine not initialized during SL2P model load; EE arrays will be initialized lazily when ee_predict is used.",
+            )
 
     def init_domain_codes(self):
         raise NotImplementedError("Domain code initialization not implemented yet.")
@@ -159,6 +179,12 @@ class LeafToolbox_MLPRegressor:
         # TODO: check function carefully!!!!!!! - Copilot generated
         # Add test case that predict() and ee_predict() give same results on same data
 
+        self._ensure_ee_arrays_initialized()
+        if self.ee_inp_slope is None:
+            raise ee.EEException(
+                "Earth Engine arrays are not initialized. Ensure ee.Initialize() was called before ee_predict()."
+            )
+
         x = ee_img.toArray()
         x = x.multiply(ee.Image(self.ee_inp_slope)).add(ee.Image(self.ee_inp_offset))
 
@@ -255,30 +281,61 @@ def _ee_angle_transform_sl2p(angle_img: ee.Image) -> ee.Image:
 
 
 def prepare_s2_input_for_sl2p(img: ee.Image) -> ee.Image:
-    """Prepare Sentinel-2 image for SL2P model input.
-
-    Parameters
-    ----------
-    - img (ee.Image): Input Sentinel-2 image with bands and angles.
-
-    Returns
-    -------
-    - ee.Image: Image with bands ordered and angles transformed for SL2P.
-
-    """
-    # Bands/angles expected on the input S2 image
+    """Prepare Sentinel-2 image for SL2P model input."""
     _s2_bands = ["B3", "B4", "B5", "B6", "B7", "B8A", "B11", "B12"]
     _s2_angles = ["tts", "tto", "psi"]
 
-    # Output names required by SL2P (cosines first, then reflectance bands)
     _sl2p_angle_names = ["cosSZA", "cosVZA", "cosRAA"]
     _sl2p_output_order = _sl2p_angle_names + _s2_bands
 
     refl = img.select(_s2_bands)
+
     cos_angles = _ee_angle_transform_sl2p(img.select(_s2_angles)).rename(
-        _sl2p_angle_names,
+        _sl2p_angle_names
     )
 
-    out = refl.addBands(cos_angles)
+    return (
+        refl.addBands(cos_angles)
+        .select(_sl2p_output_order)
+        .copyProperties(img, img.propertyNames())
+    )
 
-    return out.select(_sl2p_output_order)
+
+def prepare_s2_imgc_for_sl2p(
+    imgc: ee.ImageCollection,
+) -> ee.ImageCollection:
+    """Prepare Sentinel-2 ImageCollection for SL2P model input."""
+    return imgc.map(prepare_s2_input_for_sl2p)
+
+
+def prepare_s2_ds_for_sl2p(ds: xr.Dataset) -> xr.Dataset:
+    """Prepare Sentinel-2 xarray Dataset for SL2P model input.
+
+    The model expects the following bands:
+    - Cosine-transformed angle features: cosSZA, cosVZA, cosRAA
+    - Sentinel-2 reflectance bands: B3, B4, B5, B6, B7, B8A, B11, B12
+    Returns
+    -------
+    - xr.Dataset: Dataset with angle bands transformed and reflectance bands selected for SL2P.
+    """
+    _s2_bands = ["B3", "B4", "B5", "B6", "B7", "B8A", "B11", "B12"]
+    _s2_angles = ["tts", "tto", "psi"]
+
+    _sl2p_angle_names = ["cosSZA", "cosVZA", "cosRAA"]
+    _sl2p_output_order = _sl2p_angle_names + _s2_bands
+
+    # Compute cosine of angles in radians
+    ds_cos_angles = np.cos(np.deg2rad(ds[_s2_angles])).rename(
+        {old: new for old, new in zip(_s2_angles, _sl2p_angle_names)}
+    )
+
+    # Select reflectance bands
+    ds_refl = ds[_s2_bands]
+
+    # Combine angle and reflectance bands
+    ds_prepared = xr.merge([ds_cos_angles, ds_refl])
+
+    # Reorder bands to match SL2P expected order
+    ds_prepared = ds_prepared[_sl2p_output_order]
+
+    return ds_prepared

@@ -163,6 +163,7 @@ class FixedCadence(BaseModel):
             "quarterly",
             "yearly",
             "annual",
+            "dekadal",
         ]
     )
 
@@ -255,6 +256,40 @@ class Temporal(BaseModel):
             return
 
         name = c.interval
+        if name == "dekadal":
+            month_cursor = datetime(self.start.year, self.start.month, 1, tzinfo=UTC)
+            while month_cursor < self.end:
+                next_month = (
+                    datetime(month_cursor.year + 1, 1, 1, tzinfo=UTC)
+                    if month_cursor.month == 12
+                    else datetime(
+                        month_cursor.year, month_cursor.month + 1, 1, tzinfo=UTC
+                    )
+                )
+                month_last_day = (next_month - timedelta(days=1)).day
+                month_end = datetime(
+                    month_cursor.year,
+                    month_cursor.month,
+                    month_last_day,
+                    tzinfo=UTC,
+                )
+                month_end_exclusive = month_end + timedelta(days=1)
+                boundaries = [
+                    month_cursor,
+                    month_cursor + timedelta(days=10),
+                    month_cursor + timedelta(days=20),
+                    month_end_exclusive,
+                ]
+
+                for start_dt, end_dt in zip(boundaries[:-1], boundaries[1:]):
+                    clipped_start = max(start_dt, self.start)
+                    clipped_end = min(end_dt, self.end)
+                    if clipped_start < clipped_end:
+                        yield (clipped_start, clipped_end)
+
+                month_cursor = next_month
+            return
+
         if name in {"weekly", "biweekly"}:
             step = timedelta(days=7 if name == "weekly" else 14)
             t0 = self.start
@@ -361,7 +396,7 @@ class Temporal(BaseModel):
 # ----------------- Export options -----------------
 class ExportOpts(BaseModel):
     # only allow these three
-    destination: Literal["asset", "drive", "gcs"]
+    destination: Literal["asset", "drive", "gcs", "xee-local"]
 
     # destination-specific
     collection_path: str | None = None  # required if asset
@@ -401,6 +436,11 @@ class ExportOpts(BaseModel):
             if self.folder is not None and not isinstance(self.folder, str):
                 raise ValueError(
                     "When destination='gcs', 'folder' must be a string if provided.",
+                )
+        elif self.destination == "xee-local":
+            if not self.folder:
+                raise ValueError(
+                    "When destination='xee-local', 'folder' must be provided.",
                 )
         return self
 
@@ -442,8 +482,8 @@ def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
 
 # ----------------- Variables -----------------
 class Variables(BaseModel):
-    model: Literal["s2biophys", "sl2p"] = "s2biophys"
-    variable: Literal["laie", "fapar", "fcover"] = "laie"
+    model: Literal["s2biophys", "sl2p", "groundedeo"] = "s2biophys"
+    variable: Literal["lai", "laie", "fapar", "fcover"] = "laie"
     bands: list[
         Literal["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
     ] = ["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
@@ -455,6 +495,23 @@ class Variables(BaseModel):
     def lowercase_enums(cls, v):
         return v.lower() if isinstance(v, str) else v
 
+    @model_validator(mode="after")
+    def validate_model_variable_pair(self):
+        if self.model == "groundedeo" and self.variable not in {"lai", "fapar"}:
+            raise ValueError(
+                "When model='groundedeo', variable must be one of: 'lai', 'fapar'. "
+                "Grounded EO only supports LAI and FAPAR."
+            )
+        if self.model == "s2biophys" and self.variable not in {
+            "laie",
+            "fapar",
+            "fcover",
+        }:
+            raise ValueError(
+                "When model='s2biophys', variable must be one of: 'laie', 'fapar', 'fcover'."
+            )
+        return self
+
 
 # ----------------- Options -----------------
 class Options(BaseModel):
@@ -462,6 +519,9 @@ class Options(BaseModel):
     csplus_band: Literal["cs", "cs_cdf"] = "cs"
     cs_plus_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
     clip_min_max: bool = True
+    prediction_mode: Literal["predict_then_aggregate", "composite_then_predict"] = (
+        "predict_then_aggregate"
+    )
 
     # Enforce that *no other keys* are accepted
     model_config = ConfigDict(extra="forbid")
@@ -481,10 +541,35 @@ class ConfigParams(BaseModel):
         """Initialize Earth Engine with the specified project ID, if provided."""
         import ee
 
+        kwargs = {}
+
         if self.export.project_id:
-            ee.Initialize(project=self.export.project_id)
-        else:
-            ee.Initialize()
+            kwargs["project"] = self.export.project_id
+
+        if self.export.destination == "xee-local":
+            kwargs["opt_url"] = "https://earthengine-highvolume.googleapis.com"
+
+        ee.Initialize(**kwargs)
+        return self
+
+    # if mode: composite_then_predict, raise warning if bands include stdDev_within or stdDev_across, as stdDev_across will be 0; and thus stdDev = stdDev_within
+    # also count will be = 1, as only one composite is used
+    @model_validator(mode="after")
+    def warn_stddev_across_in_composite_then_predict(self):
+        if self.options.prediction_mode == "composite_then_predict":
+            if (
+                "stdDev_across" in self.variables.bands
+                or "stdDev_within" in self.variables.bands
+            ):
+                logger.warning(
+                    "Prediction mode is 'composite_then_predict', but 'stdDev_across' or 'stdDev_within' is included in bands. "
+                    "In this mode, stdDev_across will be 0, and stdDev = stdDev_within.",
+                )
+            if "count" in self.variables.bands:
+                logger.warning(
+                    "Prediction mode is 'composite_then_predict', but 'count' is included in bands. "
+                    "In this mode, count will always be 1 for pixels with valid data.",
+                )
         return self
 
     # if export.crs == "LOCAL_UTM", resolve to EPSG code based on spatial geometry and return updated instance

@@ -20,7 +20,8 @@ temporal:
     type: fixed                   # options: fixed, seasons
     # For 'fixed':
     # - Use an int for N-day steps (e.g., 16), OR one of:
-    #   weekly | biweekly | monthly | bimonthly | quarterly | yearly (alias: annual)
+    #   weekly | biweekly | monthly | bimonthly | quarterly | yearly (alias: annual) | dekadal
+    #   dekadal is a 10-day cadence that resets every month: 1-10, 11-20, 21-end-of-month
     interval: quarterly
 
     # If you instead want seasonal windows (cross-year allowed), use:
@@ -29,13 +30,16 @@ temporal:
     # end:   "03-15"              # MM-DD (zero-padded)
 
 variables:
-  model: s2biophys                # options: s2biophys, sl2p
-  variable: laie                  # options: laie, fapar, fcover
+  model: s2biophys                # options: s2biophys, sl2p, groundedeo
+  variable: laie                  # options: lai, laie, fapar, fcover
   bands: [mean, stdDev, stdDev_within, stdDev_across, count]    # allowed: mean, stdDev, stdDev_within, stdDev_across, count / bandnames will be {variable}_{band} / by default (recommended): [mean, stdDev, stdDev_within, stdDev_across, count]
+
+  # For groundedeo, the model is local-only and expects xee-local export.
+  # Supported variables are only 'lai' and 'fapar'.
 
 export:
   # Destination discriminator & required fields
-  destination: asset              # options: asset, drive, gcs
+  destination: asset              # options: asset, drive, gcs, xee-local
 
   # If destination == 'asset' (REQUIRED):
   collection_path: "projects/ee-yourproject/assets/custom-exports/test"
@@ -46,6 +50,10 @@ export:
   # If destination == 'gcs'  (REQUIRED):
   # bucket: "your-gcs-bucket-name"
   # folder: "biophys_exports"     # optional object prefix for GCS
+
+  # If destination == 'xee-local' (REQUIRED):
+  # folder: "/path/to/local/folder"  # local folder for exports
+  # Note: xee-local is a local export option that uses the xee library to download files from GEE to your local machine. It requires xee to be installed and configured. For very large exports, this is not recommended; use server-side predictions instead. 
 
   # Common options
   project_id: "ee-yourproject"    # optional GEE project id for exports
@@ -59,5 +67,8 @@ options:
   csplus_band: cs                 # options: cs, cs_cdf: see https://medium.com/google-earth/all-clear-with-cloud-score-bd6ee2e2235e for details
   cs_plus_threshold: 0.70         # 0.0..1.0 (higher = more conservative)
   clip_min_max: true              # if true, clips predictions to (0, 1) for fapar and fcover, and (0, 8) for laie/lai
+  prediction_mode: predict_then_aggregate   # options: predict_then_aggregate, composite_then_predict
+  # composite_then_predict is the fast mode: it composites first, then predicts once.
+  # In composite_then_predict, stdDev_across is 0 and count is 1 for valid pixels.
 
 version: "v02"                    # corresponds to current s2biophys version (only v02 implemented), allows future changes

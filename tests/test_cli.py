@@ -3,7 +3,7 @@ import yaml
 
 from gee_biophys.config import ConfigParams
 from gee_biophys.s2_input import load_s2_input
-from gee_biophys.s2_predict import biophys_predict
+from gee_biophys.s2_predict import biophys_predict_ee
 
 ATOL = 1e-5
 N_SAMPLES = 10
@@ -30,7 +30,12 @@ def test_cli(ee_init, config_path):
         imgc = load_s2_input(cfg, interval_start, interval_end)
         imgc.getInfo()  # force evaluation to catch errors
 
-        output_image = biophys_predict(cfg, imgc)
+        output_image = biophys_predict_ee(
+            variable=cfg.variables.variable,
+            model=cfg.variables.model,
+            input_imgc=imgc,
+            clip_min_max=True,
+        )
         output_image.getInfo()  # force evaluation to catch errors
         break
 
@@ -51,3 +56,7 @@ def test_configs(config_path):
         assert cfg.export.crs == "EPSG:32632"  # ensure LOCAL_UTM is resolved
 
     assert isinstance(cfg, ConfigParams)
+
+
+if __name__ == "__main__":
+    pytest.main(["-v", __file__])

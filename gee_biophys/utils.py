@@ -1,6 +1,8 @@
+import os
 from datetime import datetime, timedelta
 
 import ee
+import xarray as xr
 from dateutil.relativedelta import relativedelta
 from loguru import logger
 
@@ -72,6 +74,8 @@ def update_image_metadata(
         ee.Image: The image with updated metadata.
         ["system:time_start", "system:time_end", "model", "variable", "export_scale", "output_crs", "system:index"]
 
+        # selects the bands in cfg.export.output_bands, and renames them to the names in cfg.export.output_bands
+
         # system:index follows filenaming convention: [variable]_[model]_[output_bands (joined by '-')]_[output_resolution]m_s_[startdate(YYYYMMDD)]_[enddate(YYYYMMDD)]_[tile]_[crs(epsg lower and swap : with .)]_[version]
 
     """
@@ -91,7 +95,40 @@ def update_image_metadata(
             "system:index": index_str,
         },
     )
-    return updated_image
+
+    bandnames = [f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands]
+    return updated_image.select(bandnames)
+
+
+def update_dataset_metadata(
+    ds: xr.Dataset,
+    interval_start: datetime,
+    interval_end: datetime,
+    cfg: ConfigParams,
+) -> xr.Dataset:
+    """Attach metadata to local xarray outputs with keys aligned to EE outputs."""
+    index_str = get_system_index(cfg, interval_start, interval_end)
+    cfg_string = _get_cfg_string(cfg)
+
+    attrs = dict(ds.attrs)
+    attrs.update(
+        {
+            "system:time_start": int(interval_start.timestamp() * 1000),
+            "system:time_end": int(interval_end.timestamp() * 1000),
+            "model": cfg.variables.model,
+            "variable": cfg.variables.variable,
+            "export_scale": cfg.export.scale,
+            "output_crs": cfg.export.crs,
+            "config": cfg_string,
+            "system:index": index_str,
+        }
+    )
+
+    band_names = [
+        f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands
+    ]
+
+    return ds.assign_attrs(attrs)[band_names]
 
 
 def generate_intervals(start, end, temporal_interval):
@@ -109,6 +146,32 @@ def generate_intervals(start, end, temporal_interval):
         advance = lambda t: t + timedelta(days=temporal_interval)  # noqa
     elif isinstance(temporal_interval, str):
         temporal_interval = temporal_interval.lower()
+        if temporal_interval == "dekadal":
+            intervals = []
+            current = start
+            while current < end:
+                month_start = datetime(current.year, current.month, 1)
+                next_month = (
+                    datetime(current.year + 1, 1, 1)
+                    if current.month == 12
+                    else datetime(current.year, current.month + 1, 1)
+                )
+                month_end_exclusive = next_month
+                boundaries = [
+                    month_start,
+                    month_start + timedelta(days=10),
+                    month_start + timedelta(days=20),
+                    month_end_exclusive,
+                ]
+                for period_start, period_end in zip(boundaries[:-1], boundaries[1:]):
+                    clipped_start = max(period_start, start)
+                    clipped_end = min(period_end, end)
+                    if clipped_start < clipped_end:
+                        intervals.append((clipped_start, clipped_end))
+                current = next_month
+            logger.debug(f"Generated {len(intervals)} time intervals.")
+            return intervals
+
         mapping = {
             "weekly": dict(weeks=1),
             "biweekly": dict(weeks=2),
@@ -194,6 +257,13 @@ def initialize_export_location(cfg: ConfigParams, set_public: bool = False) -> N
     elif loc == "gcs":
         logger.info(
             f"Assets will be exported to: gs://{cfg.export.bucket}/{cfg.export.folder}",
+        )
+    elif loc == "xee-local":
+        if not os.path.exists(cfg.export.folder):
+            os.makedirs(cfg.export.folder, exist_ok=True)
+
+        logger.info(
+            f"Assets will be exported to local disk folder: {cfg.export.folder}",
         )
     else:
         raise ValueError(f"Unknown output_location: {loc}")

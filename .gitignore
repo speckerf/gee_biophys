@@ -17,3 +17,4 @@ test_configs/
 geometries/data/
 geometries/prepare_zurich.py
 
+exports/

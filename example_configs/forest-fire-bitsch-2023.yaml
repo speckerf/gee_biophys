@@ -24,8 +24,9 @@ options:
 
 export:
   project_id: ee-speckerfelix
-  destination: asset # options: asset, drive, gcs
-  collection_path: projects/ee-speckerfelix/assets/custom-exports/forest-fire-ch-bitsch # used if destination is asset
+  destination: xee-local # options: asset, drive, gcs, xee-local
+  # collection_path: projects/ee-speckerfelix/assets/custom-exports/forest-fire-ch-bitsch # used if destination is asset
+  folder: /Users/felix/Projects/OEMC/gee_biophys/exports/forest-fire-ch-bitsch # used if destination is xee-local
   crs: LOCAL_UTM
   scale: 20
   max_pixels: 100_000_000_000 # 1e11
