@@ -1,14 +1,13 @@
-from types import SimpleNamespace
-
-import ee
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
 
-from gee_biophys.models.s2biophys import _ee_calibrate_std
-from gee_biophys.s2_predict import _calibrate_std_local, biophys_predict_local
-from gee_biophys.utils_predict import reduce_ensemble_preds
+from gee_biophys.s2_predict import (
+    _aggregate_prediction_times,
+    _calibrate_std_local,
+    biophys_predict_local,
+)
 
 ALL_BANDS = [
     "B1",
@@ -52,23 +51,6 @@ SL2P_BANDS = [
 ANGLE_BANDS = ["tts", "tto", "psi"]
 
 
-def _make_cfg(
-    model: str,
-    variable: str,
-    bands: list[str],
-):
-    return SimpleNamespace(
-        variables=SimpleNamespace(
-            model=model,
-            variable=variable,
-            bands=bands,
-        ),
-        options=SimpleNamespace(
-            clip_min_max=True,
-        ),
-    )
-
-
 def _make_s2_dataset(
     *,
     shape: tuple[int, int, int] = (3, 2, 2),
@@ -98,20 +80,8 @@ def test_biophys_predict_local_s2biophys_outputs():
     )
     ds["B2"][0, 0, 0] = np.nan
 
-    cfg = _make_cfg(
-        model="s2biophys",
-        variable="fapar",
-        bands=[
-            "mean",
-            "stdDev",
-            "stdDev_within",
-            "stdDev_across",
-            "count",
-        ],
-    )
-
     out = biophys_predict_local(
-        ds, variable=cfg.variables.variable, model=cfg.variables.model, cfg=cfg
+        ds, variable="fapar", model="s2biophys", clip_min_max=True
     )
 
     assert set(out.data_vars) == {
@@ -134,19 +104,13 @@ def test_biophys_predict_local_sl2p_outputs():
         seed=11,
     )
 
-    cfg = _make_cfg(
-        model="sl2p",
-        variable="laie",
-        bands=["mean", "stdDev", "count"],
-    )
-
-    out = biophys_predict_local(
-        ds, variable=cfg.variables.variable, model=cfg.variables.model, cfg=cfg
-    )
+    out = biophys_predict_local(ds, variable="laie", model="sl2p", clip_min_max=True)
 
     assert set(out.data_vars) == {
         "laie_mean",
         "laie_stdDev",
+        "laie_stdDev_within",
+        "laie_stdDev_across",
         "laie_count",
     }
 
@@ -193,20 +157,8 @@ def test_biophys_predict_local_s2biophys_uncertainty_calibration(
         | {angle: (dims, np.full(shape, 20.0)) for angle in ANGLE_BANDS}
     )
 
-    cfg = _make_cfg(
-        model="s2biophys",
-        variable="laie",
-        bands=[
-            "mean",
-            "stdDev",
-            "stdDev_within",
-            "stdDev_across",
-            "count",
-        ],
-    )
-
     out = biophys_predict_local(
-        ds, variable=cfg.variables.variable, model=cfg.variables.model, cfg=cfg
+        ds, variable="laie", model="s2biophys", clip_min_max=True
     )
 
     # Ensemble predictions are [1, 3].
@@ -226,12 +178,7 @@ def test_biophys_predict_local_s2biophys_uncertainty_calibration(
     assert out["laie_count"].item() == 2
 
 
-def test_s2biophys_calibrated_stddev_ee_local_parity(ee_init):
-    variable = "fapar"
-
-    mean_band = f"{variable}_mean"
-    std_band = f"{variable}_stdDev"
-
+def test_calibrated_stddev_is_aggregated_into_total_uncertainty():
     means = np.array(
         [0.2, 0.5, 0.9],
         dtype=float,
@@ -248,86 +195,31 @@ def test_s2biophys_calibrated_stddev_ee_local_parity(ee_init):
         }
     )
 
-    # Local implementation
     pred_mean_time = means.reshape(-1, 1, 1)
     pred_std_time = stds.reshape(-1, 1, 1)
-
     pred_std_time_cal = _calibrate_std_local(
         pred_mean_time,
         pred_std_time,
         calibration_table,
     )
-
-    local_mean = np.nanmean(
-        pred_mean_time,
-        axis=0,
-    ).item()
-
-    local_std_within = np.nanmean(
-        pred_std_time_cal,
-        axis=0,
-    ).item()
-
-    local_std_across = np.nanstd(
-        pred_mean_time,
-        axis=0,
-        ddof=1,
-    ).item()
-
-    local_std_total = np.sqrt(local_std_within**2 + local_std_across**2)
-
-    local_count = np.sum(
-        np.isfinite(pred_mean_time),
-        axis=0,
-    ).item()
-
-    # Earth Engine implementation
-    ee_images = []
-
-    for mean, std in zip(means, stds):
-        img = (
-            ee.Image.constant([float(mean), float(std)])
-            .rename([mean_band, std_band])
-            .toFloat()
-        )
-
-        ee_images.append(
-            _ee_calibrate_std(
-                img,
-                calibration_table,
-                variable,
-            )
-        )
-
-    ee_imgc = ee.ImageCollection(ee_images)
-
-    ee_reduced = reduce_ensemble_preds(
-        ee_imgc,
-        variable,
+    mean, total, within, across, count = _aggregate_prediction_times(
+        pred_mean_time, pred_std_time_cal
     )
 
-    ee_values = ee_reduced.reduceRegion(
-        reducer=ee.Reducer.first(),
-        geometry=ee.Geometry.Point([0, 0]),
-        scale=1000,
-        bestEffort=True,
-        maxPixels=1e9,
-    ).getInfo()
+    expected_calibrated_stds = np.array([0.12, 0.30, 0.57])
+    expected_within = expected_calibrated_stds.mean()
+    expected_across = means.std(ddof=1)
 
-    assert ee_values[mean_band] == pytest.approx(
-        local_mean,
-        abs=1e-6,
+    np.testing.assert_allclose(pred_std_time_cal[:, 0, 0], expected_calibrated_stds)
+    assert mean.item() == pytest.approx(means.mean())
+    assert within.item() == pytest.approx(expected_within)
+    assert across.item() == pytest.approx(expected_across)
+    assert total.item() == pytest.approx(
+        np.sqrt(expected_within**2 + expected_across**2)
     )
-    assert ee_values[f"{variable}_stdDev_within"] == pytest.approx(
-        local_std_within,
-        abs=1e-6,
-    )
-    assert ee_values[f"{variable}_stdDev_across"] == pytest.approx(
-        local_std_across,
-        abs=1e-6,
-    )
-    assert ee_values[std_band] == pytest.approx(
-        local_std_total,
-        abs=1e-6,
-    )
-    assert int(ee_values[f"{variable}_count"]) == int(local_count)
+    assert count.item() == 3
+
+
+def test_biophys_predict_local_rejects_unknown_model():
+    with pytest.raises(ValueError, match="Unsupported model: unknown"):
+        biophys_predict_local(_make_s2_dataset(), variable="fapar", model="unknown")
