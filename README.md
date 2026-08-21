@@ -14,11 +14,12 @@ This tool enables users to define custom time windows, temporal frequency, regio
 
 **gee-biophys** enables flexible and reproducible export of time-series vegetation biophysical maps, addressing the need for user-defined temporal aggregation of Sentinel-2–derived biophysical variable retrievals.
 
-The tool builds on the **PROSAIL**-based *s2biophys* retrieval framework, producing consistent global estimates of:
+The tool builds on the **PROSAIL**-based *s2biophys* retrieval framework, and also supports a local-only **Grounded EO** Gaussian-process model trained directly on in situ validation data. Together, the package supports consistent estimates of:
 
 - Effective Leaf Area Index (**LAIe**)
 - Fraction of Absorbed Photosynthetically Active Radiation (**FAPAR**)
 - Fractional Vegetation Cover (**FCOVER**)
+- Local-only Grounded EO predictions for **LAI** and **FAPAR**
 
 Each export includes:
 
@@ -35,7 +36,8 @@ Each export includes:
 - Modular YAML configuration for reproducibility
 - Exports directly to **Google Earth Engine assets**, **Google Drive**, or **Google Cloud Storage**
 - Available as both a **Python package** and **CLI tool**
-- Supports two models: **[s2biophys](https://www.researchsquare.com/article/rs-6343364/v1)** and **[SL2P](https://github.com/djamainajib/SL2P-PYTHON)** models
+- Supports three model families: **[s2biophys](https://www.researchsquare.com/article/rs-6343364/v1)**, **[SL2P](https://github.com/djamainajib/SL2P-PYTHON)**, and a local-only **Grounded EO** Gaussian-process model
+- Grounded EO is available for **LAI** and **FAPAR** only and requires the **xee-local** export mode
 
 ------
 
@@ -150,6 +152,37 @@ options:
 
 version: "v02"
 ```
+
+### Grounded EO local-only configuration
+
+The Grounded EO model is a local, in situ–trained Gaussian-process predictor. It is currently supported only for the variables `lai` and `fapar`, and it requires the `xee-local` export destination because prediction runs locally on the exported xarray dataset.
+
+```yaml
+variables:
+  model: groundedeo
+  variable: lai
+
+export:
+  destination: xee-local
+  folder: "/path/to/local/export"
+  crs: "EPSG:4326"
+  scale: 100
+```
+
+This model returns local outputs with the naming convention:
+
+- `grounded_lai_mean`, `grounded_lai_std`
+- `grounded_fapar_mean`, `grounded_fapar_std`
+
+### External notebook entrypoint (stack/composite + model comparison)
+
+You can use `gee_biophys` directly from an external Jupyter notebook to:
+
+- load Sentinel-2 data for one interval as full stack or as one composite,
+- fetch it locally as an xarray dataset via xee,
+- run one or multiple models for map-to-map comparison.
+
+- see notebooks/
 
 ------
 

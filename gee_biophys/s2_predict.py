@@ -3,9 +3,21 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from gee_biophys.config import ConfigParams
-from gee_biophys.models.s2biophys import eeEnsemblePredictSingleImg, load_model_ensemble
-from gee_biophys.models.sl2p import load_SL2P_model
+from gee_biophys.models.grounded_eo import (
+    load_grounded_eo_model,
+    prepare_s2_ds_for_groundedeo,
+)
+from gee_biophys.models.s2biophys import (
+    eeEnsemblePredictSingleImg,
+    load_model_ensemble,
+    prepare_s2_ds_for_s2biophys,
+    prepare_s2_imgc_for_s2biophys,
+)
+from gee_biophys.models.sl2p import (
+    load_SL2P_model,
+    prepare_s2_ds_for_sl2p,
+    prepare_s2_imgc_for_sl2p,
+)
 from gee_biophys.utils_predict import (
     aggregate_ensemble_predictions,
     reduce_ensemble_preds,
@@ -25,43 +37,22 @@ def _clip_trait_array(values: np.ndarray, trait_name: str) -> np.ndarray:
     return np.clip(values, vmin, vmax)
 
 
-def _resolve_band_name(ds: xr.Dataset, band_name: str) -> str | None:
-    if band_name in ds.data_vars:
-        return band_name
-
-    if band_name.startswith("B0") and len(band_name) == 3:
-        alt_name = f"B{band_name[2]}"
-        if alt_name in ds.data_vars:
-            return alt_name
-
-    if band_name.startswith("B") and len(band_name) == 2 and band_name[1].isdigit():
-        alt_name = f"B0{band_name[1]}"
-        if alt_name in ds.data_vars:
-            return alt_name
-
-    return None
-
-
 def _dataset_to_matrix(
-    ds: xr.Dataset, band_order: list[str]
+    ds: xr.Dataset,
+    # band_order: list[str],
 ) -> tuple[np.ndarray, tuple]:
-    resolved_bands = []
-    missing = []
-    for band in band_order:
-        resolved = _resolve_band_name(ds, band)
-        if resolved is None:
-            missing.append(band)
-        else:
-            resolved_bands.append(resolved)
+    """Convert an xarray Dataset to a 2D prediction matrix.
 
-    if missing:
-        raise ValueError(f"Input dataset is missing required bands: {missing}")
+    Assumes all required bands exist and are already named correctly.
+    """
+    # arr = ds[band_order].to_array(dim="band")
+    arr = ds.to_array(dim="band")
 
-    arr = ds[resolved_bands].to_array(dim="band")
     if "time" not in arr.dims:
         raise ValueError("Local prediction expects a 'time' dimension in the input.")
 
     non_time_dims = [dim for dim in arr.dims if dim not in {"band", "time"}]
+
     arr = arr.transpose("time", *non_time_dims, "band")
 
     np_arr = arr.values
@@ -155,120 +146,345 @@ def _calibrate_std_local(
     return calibrated_flat.reshape(pred_std_time.shape)
 
 
+def _aggregate_prediction_times(
+    pred_mean_time: np.ndarray,
+    pred_std_time: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Aggregate per-acquisition predictions over time.
+
+    Parameters
+    ----------
+    pred_mean_time
+        Per-acquisition mean predictions with shape (time, ...).
+    pred_std_time
+        Per-acquisition predictive standard deviations with shape (time, ...).
+
+    Returns
+    -------
+    preds_mean
+        Mean prediction across acquisitions.
+    preds_std_total
+        Total standard deviation:
+        sqrt(std_within**2 + std_across**2).
+    preds_std_within
+        Mean per-acquisition predictive standard deviation.
+    preds_std_across
+        Sample standard deviation of per-acquisition mean predictions.
+    preds_count
+        Number of valid acquisitions per pixel.
+    """
+    preds_mean = np.nanmean(pred_mean_time, axis=0)
+
+    # Typical predictive uncertainty within an acquisition.
+    preds_std_within = np.nanmean(pred_std_time, axis=0)
+
+    # Temporal/acquisition-to-acquisition variability.
+    preds_std_across = np.nanstd(
+        pred_mean_time,
+        axis=0,
+        ddof=1,
+    )
+
+    # sample SD is undefined for n=1; treat observed across-time variation as 0
+    preds_std_across = np.where(
+        np.isnan(preds_std_across) & np.isfinite(preds_std_within),
+        0.0,
+        preds_std_across,
+    )
+
+    preds_std_total = np.sqrt(preds_std_within**2 + preds_std_across**2)
+
+    preds_count = np.sum(
+        np.isfinite(pred_mean_time),
+        axis=0,
+    ).astype(np.int32)
+
+    return (
+        preds_mean,
+        preds_std_total,
+        preds_std_within,
+        preds_std_across,
+        preds_count,
+    )
+
+
 def _predict_local_s2biophys(
-    cfg: ConfigParams,
     input_ds: xr.Dataset,
+    variable: str,
+    clip_min_max: bool = True,
 ) -> xr.Dataset:
     (
         s2biophys_model_ensemble,
         (_, uncertainty_calibration_table),
-    ) = load_model_ensemble(cfg.variables.variable)
+    ) = load_model_ensemble(variable)
 
-    band_order = [
-        "B2",
-        "B3",
-        "B4",
-        "B5",
-        "B6",
-        "B7",
-        "B8",
-        "B8A",
-        "B11",
-        "B12",
-        "tts",
-        "tto",
-        "psi",
-    ]
-
-    matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(input_ds, band_order)
+    matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(input_ds)
     valid = np.all(np.isfinite(matrix), axis=1)
 
-    per_member = []
     valid_df = (
-        pd.DataFrame(matrix[valid], columns=band_order) if np.any(valid) else None
+        pd.DataFrame(matrix[valid], columns=input_ds.data_vars)
+        if np.any(valid)
+        else None
     )
-    models = sorted(s2biophys_model_ensemble.items(), key=lambda kv: kv[0])
+
+    per_member = []
+
+    models = sorted(
+        s2biophys_model_ensemble.items(),
+        key=lambda kv: kv[0],
+    )
+
     for _, model in models:
-        pred_flat = np.full(matrix.shape[0], np.nan, dtype=float)
+        pred_flat = np.full(
+            matrix.shape[0],
+            np.nan,
+            dtype=float,
+        )
+
         if np.any(valid):
             pred_flat[valid] = model["pipeline"].predict(valid_df).ravel()
-        per_member.append(_matrix_to_cube(pred_flat, full_shape))
 
-    member_cube = np.stack(per_member, axis=0)
-    pred_mean_time = np.nanmean(member_cube, axis=0)
-    pred_std_time = np.nanstd(member_cube, axis=0)
+        per_member.append(
+            _matrix_to_cube(
+                pred_flat,
+                full_shape,
+            )
+        )
+
+    # (member, time, y, x)
+    member_cube = np.stack(
+        per_member,
+        axis=0,
+    )
+
+    # Mean and sample SD across ensemble members,
+    # independently for each acquisition.
+    pred_mean_time = np.nanmean(
+        member_cube,
+        axis=0,
+    )
+    pred_std_time = np.nanstd(
+        member_cube,
+        axis=0,
+        ddof=1,
+    )
+
     pred_std_time = _calibrate_std_local(
         pred_mean_time,
         pred_std_time,
         uncertainty_calibration_table,
     )
 
-    preds_mean = np.nanmean(pred_mean_time, axis=0)
-    preds_std_within = np.nanmean(pred_std_time, axis=0)
-    preds_std_across = np.nanstd(pred_mean_time, axis=0, ddof=1)
-    preds_std_across = np.where(
-        np.isnan(preds_std_across) & np.isfinite(preds_std_within),
-        0.0,
+    (
+        preds_mean,
+        preds_std_total,
+        preds_std_within,
         preds_std_across,
+        preds_count,
+    ) = _aggregate_prediction_times(
+        pred_mean_time,
+        pred_std_time,
     )
-    preds_std_total = np.sqrt(preds_std_within**2 + preds_std_across**2)
-    preds_count = np.sum(np.isfinite(pred_mean_time), axis=0).astype(np.int32)
 
-    if cfg.options.clip_min_max:
-        preds_mean = _clip_trait_array(preds_mean, cfg.variables.variable)
+    if clip_min_max:
+        preds_mean = _clip_trait_array(
+            preds_mean,
+            variable,
+        )
 
     outputs = {
-        f"{cfg.variables.variable}_mean": preds_mean,
-        f"{cfg.variables.variable}_stdDev": preds_std_total,
-        f"{cfg.variables.variable}_stdDev_within": preds_std_within,
-        f"{cfg.variables.variable}_stdDev_across": preds_std_across,
-        f"{cfg.variables.variable}_count": preds_count,
+        f"{variable}_mean": preds_mean,
+        f"{variable}_stdDev": preds_std_total,
+        f"{variable}_stdDev_within": preds_std_within,
+        f"{variable}_stdDev_across": preds_std_across,
+        f"{variable}_count": preds_count,
     }
-    return _build_output_dataset(arr, non_time_dims, outputs)
+
+    return _build_output_dataset(
+        arr,
+        non_time_dims,
+        outputs,
+    )
 
 
 def _predict_local_sl2p(
-    cfg: ConfigParams,
     input_ds: xr.Dataset,
+    variable: str,
+    clip_min_max: bool = True,
 ) -> xr.Dataset:
-    model_mean, model_std = load_SL2P_model(variable=cfg.variables.variable)
+    model_mean, model_std = load_SL2P_model(variable=variable)
 
-    band_order = model_mean.bandorder
-    matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(input_ds, band_order)
+    matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(
+        input_ds,
+    )
     valid = np.all(np.isfinite(matrix), axis=1)
 
-    pred_mean_flat = np.full(matrix.shape[0], np.nan, dtype=float)
-    pred_std_flat = np.full(matrix.shape[0], np.nan, dtype=float)
+    pred_mean_flat = np.full(
+        matrix.shape[0],
+        np.nan,
+        dtype=float,
+    )
+    pred_std_flat = np.full(
+        matrix.shape[0],
+        np.nan,
+        dtype=float,
+    )
+
     if np.any(valid):
-        pred_mean_flat[valid] = model_mean.predict(matrix[valid], clip_min_max=False)
-        pred_std_flat[valid] = model_std.predict(matrix[valid], clip_min_max=False)
+        pred_mean_flat[valid] = model_mean.predict(
+            matrix[valid],
+            clip_min_max=False,
+        )
 
-    pred_mean_time = _matrix_to_cube(pred_mean_flat, full_shape)
-    pred_std_time = _matrix_to_cube(pred_std_flat, full_shape)
+        pred_std_flat[valid] = model_std.predict(
+            matrix[valid],
+            clip_min_max=False,
+        )
 
-    preds_mean = np.nanmean(pred_mean_time, axis=0)
-    if cfg.options.clip_min_max:
-        preds_mean = _clip_trait_array(preds_mean, cfg.variables.variable)
+    # (time, y, x)
+    pred_mean_time = _matrix_to_cube(
+        pred_mean_flat,
+        full_shape,
+    )
+    pred_std_time = _matrix_to_cube(
+        pred_std_flat,
+        full_shape,
+    )
 
-    img_within_var = np.nanmean(pred_std_time**2, axis=0)
-    img_between_var = np.nanvar(pred_mean_time, axis=0)
-    preds_std_total = np.sqrt(img_within_var + img_between_var)
-    preds_count = np.sum(np.isfinite(pred_mean_time), axis=0).astype(np.int32)
+    (
+        preds_mean,
+        preds_std_total,
+        preds_std_within,
+        preds_std_across,
+        preds_count,
+    ) = _aggregate_prediction_times(
+        pred_mean_time,
+        pred_std_time,
+    )
+
+    if clip_min_max:
+        preds_mean = _clip_trait_array(
+            preds_mean,
+            variable,
+        )
 
     outputs = {
-        f"{cfg.variables.variable}_mean": preds_mean,
-        f"{cfg.variables.variable}_stdDev": preds_std_total,
-        f"{cfg.variables.variable}_count": preds_count,
+        f"{variable}_mean": preds_mean,
+        f"{variable}_stdDev": preds_std_total,
+        f"{variable}_stdDev_within": preds_std_within,
+        f"{variable}_stdDev_across": preds_std_across,
+        f"{variable}_count": preds_count,
     }
-    return _build_output_dataset(arr, non_time_dims, outputs)
+
+    return _build_output_dataset(
+        arr,
+        non_time_dims,
+        outputs,
+    )
 
 
-def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Image:
+def _predict_local_grounded_eo(
+    input_ds: xr.Dataset,
+    variable: str,
+    clip_min_max: bool = True,
+) -> xr.Dataset:
+    matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(
+        input_ds,
+    )
+    valid = np.all(np.isfinite(matrix), axis=1)
+
+    model_key = variable.upper()
+
+    model, upper_lim = load_grounded_eo_model(model_key)
+
+    pred_mean_flat = np.full(
+        matrix.shape[0],
+        np.nan,
+        dtype=float,
+    )
+    pred_std_flat = np.full(
+        matrix.shape[0],
+        np.nan,
+        dtype=float,
+    )
+
+    if np.any(valid):
+        input_name = model.get_inputs()[0].name
+
+        pred_mean, pred_std = model.run(
+            None,
+            {
+                input_name: matrix[valid].astype(np.float64),
+            },
+        )
+
+        pred_mean = np.asarray(pred_mean).squeeze()
+        pred_std = np.asarray(pred_std).squeeze()
+
+        pred_mean_flat[valid] = np.clip(
+            pred_mean,
+            0.0,
+            upper_lim,
+        )
+        pred_std_flat[valid] = pred_std
+
+    # (time, y, x)
+    pred_mean_time = _matrix_to_cube(
+        pred_mean_flat,
+        full_shape,
+    )
+    pred_std_time = _matrix_to_cube(
+        pred_std_flat,
+        full_shape,
+    )
+
+    (
+        preds_mean,
+        preds_std_total,
+        preds_std_within,
+        preds_std_across,
+        preds_count,
+    ) = _aggregate_prediction_times(
+        pred_mean_time,
+        pred_std_time,
+    )
+
+    if clip_min_max:
+        preds_mean = _clip_trait_array(
+            preds_mean,
+            variable,
+        )
+
+    prefix = f"{variable.lower()}"
+
+    outputs = {
+        f"{prefix}_mean": preds_mean,
+        f"{prefix}_stdDev": preds_std_total,
+        f"{prefix}_stdDev_within": preds_std_within,
+        f"{prefix}_stdDev_across": preds_std_across,
+        f"{prefix}_count": preds_count,
+    }
+
+    return _build_output_dataset(
+        arr,
+        non_time_dims,
+        outputs,
+    )
+
+
+def biophys_predict_ee(
+    variable: str,
+    model: str,
+    input_imgc: ee.ImageCollection,
+    clip_min_max: bool,
+) -> ee.Image:
     """Apply the selected biophysical model to the input Sentinel-2 ImageCollection
     and return an ImageCollection with predicted biophysical variables.
     """
-    if cfg.variables.model == "sl2p":
-        model_mean, model_std = load_SL2P_model(variable=cfg.variables.variable)
+    if model == "sl2p":
+        input_imgc = prepare_s2_imgc_for_sl2p(input_imgc)
+        model_mean, model_std = load_SL2P_model(variable=variable)
 
         pred_mean_imgc = input_imgc.map(lambda img: model_mean.ee_predict(img))
         pred_std_imgc = input_imgc.map(lambda img: model_std.ee_predict(img))
@@ -276,77 +492,75 @@ def biophys_predict(cfg: ConfigParams, input_imgc: ee.ImageCollection) -> ee.Ima
         output_image = aggregate_ensemble_predictions(
             pred_mean_imgc,
             pred_std_imgc,
-            cfg.variables.variable,
-            clip_min_max=cfg.options.clip_min_max,
+            variable,
+            clip_min_max=clip_min_max,
         )
 
         water_mask_2020 = ee.ImageCollection("ESA/WorldCover/v200").first()
         output_image = output_image.updateMask(water_mask_2020.neq(80))
 
-    elif cfg.variables.model == "s2biophys":
+    elif model == "s2biophys":
+        input_imgc = prepare_s2_imgc_for_s2biophys(input_imgc)
         (
             s2biophys_model_ensemble,
             (uncertainty_calibration_model, uncertainty_calibration_table),
-        ) = load_model_ensemble(cfg.variables.variable)
+        ) = load_model_ensemble(variable)
 
         imgc_preds = input_imgc.map(
             lambda img: eeEnsemblePredictSingleImg(
                 ensemble=s2biophys_model_ensemble,
                 img=img,
-                variable=cfg.variables.variable,
+                variable=variable,
                 calibrate_uncertainty=True,
                 uncertainty_calibration_table=uncertainty_calibration_table,
             )
         )
-
-        # b = eeEnsemblePredictSingleImg(
-        #     s2biophys_model_ensemble,
-        #     input_imgc.first(),
-        #     cfg.variables.variable,
-        #     calibrate_uncertainty=False,
-        # )
-
         # reduce to mean / stdDev_across-images / stdDev_within-images per group
         output_image = reduce_ensemble_preds(
             imgc_preds,
-            cfg.variables.variable,
+            variable,
         )
 
         water_mask_2020 = ee.ImageCollection("ESA/WorldCover/v200").first()
         output_image = output_image.updateMask(water_mask_2020.neq(80))
 
     else:
-        raise ValueError(f"Unsupported model: {cfg.variables.model}")
+        raise ValueError(f"Unsupported model: {model}")
 
     # select only desired output bands
-    output_band_names = [
-        f"{cfg.variables.variable}_{band}" for band in cfg.variables.bands
-    ]
+    # output_band_names = [f"{variable}_{band}" for band in cfg.variables.bands]
 
-    return output_image.select(output_band_names)
+    # return output_image.select(output_band_names)
+    return output_image
 
 
-def biophys_predict_local(cfg: ConfigParams, input_ds: xr.Dataset) -> xr.Dataset:
+def biophys_predict_local(
+    input_ds: xr.Dataset,
+    variable: str,
+    model: str,
+    clip_min_max: bool = True,
+) -> xr.Dataset:
     """Run local biophysical prediction from an xarray Dataset.
 
     The expected input dataset is the output of ``load_s2_input_xarray`` and therefore
     contains model-specific bands already prepared on the GEE side.
     """
-    if cfg.variables.model == "sl2p":
-        output_ds = _predict_local_sl2p(cfg, input_ds)
-    elif cfg.variables.model == "s2biophys":
-        output_ds = _predict_local_s2biophys(cfg, input_ds)
-    else:
-        raise ValueError(f"Unsupported model: {cfg.variables.model}")
-
-    output_band_names = [
-        f"{cfg.variables.variable}_{band}" for band in cfg.variables.bands
-    ]
-    missing_bands = [band for band in output_band_names if band not in output_ds]
-    if missing_bands:
-        raise ValueError(
-            "Requested output bands are not available for local prediction: "
-            f"{missing_bands}"
+    if model == "sl2p":
+        input_ds = prepare_s2_ds_for_sl2p(input_ds)
+        output_ds = _predict_local_sl2p(
+            input_ds, variable=variable, clip_min_max=clip_min_max
         )
+    elif model == "s2biophys":
+        input_ds = prepare_s2_ds_for_s2biophys(input_ds)
+        output_ds = _predict_local_s2biophys(
+            input_ds, variable=variable, clip_min_max=clip_min_max
+        )
+    elif model == "groundedeo":
+        input_ds = prepare_s2_ds_for_groundedeo(input_ds)
+        output_ds = _predict_local_grounded_eo(
+            input_ds, variable=variable, clip_min_max=clip_min_max
+        )
+    else:
+        raise ValueError(f"Unsupported model: {model}")
 
-    return output_ds[output_band_names]
+    return output_ds

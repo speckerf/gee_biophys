@@ -74,6 +74,8 @@ def update_image_metadata(
         ee.Image: The image with updated metadata.
         ["system:time_start", "system:time_end", "model", "variable", "export_scale", "output_crs", "system:index"]
 
+        # selects the bands in cfg.export.output_bands, and renames them to the names in cfg.export.output_bands
+
         # system:index follows filenaming convention: [variable]_[model]_[output_bands (joined by '-')]_[output_resolution]m_s_[startdate(YYYYMMDD)]_[enddate(YYYYMMDD)]_[tile]_[crs(epsg lower and swap : with .)]_[version]
 
     """
@@ -93,7 +95,9 @@ def update_image_metadata(
             "system:index": index_str,
         },
     )
-    return updated_image
+
+    bandnames = [f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands]
+    return updated_image.select(bandnames)
 
 
 def update_dataset_metadata(
@@ -120,7 +124,11 @@ def update_dataset_metadata(
         }
     )
 
-    return ds.assign_attrs(attrs)
+    band_names = [
+        f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands
+    ]
+
+    return ds.assign_attrs(attrs)[band_names]
 
 
 def generate_intervals(start, end, temporal_interval):

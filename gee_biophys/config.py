@@ -482,8 +482,8 @@ def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
 
 # ----------------- Variables -----------------
 class Variables(BaseModel):
-    model: Literal["s2biophys", "sl2p"] = "s2biophys"
-    variable: Literal["laie", "fapar", "fcover"] = "laie"
+    model: Literal["s2biophys", "sl2p", "groundedeo"] = "s2biophys"
+    variable: Literal["lai", "laie", "fapar", "fcover"] = "laie"
     bands: list[
         Literal["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
     ] = ["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
@@ -495,6 +495,23 @@ class Variables(BaseModel):
     def lowercase_enums(cls, v):
         return v.lower() if isinstance(v, str) else v
 
+    @model_validator(mode="after")
+    def validate_model_variable_pair(self):
+        if self.model == "groundedeo" and self.variable not in {"lai", "fapar"}:
+            raise ValueError(
+                "When model='groundedeo', variable must be one of: 'lai', 'fapar'. "
+                "Grounded EO only supports LAI and FAPAR."
+            )
+        if self.model == "s2biophys" and self.variable not in {
+            "laie",
+            "fapar",
+            "fcover",
+        }:
+            raise ValueError(
+                "When model='s2biophys', variable must be one of: 'laie', 'fapar', 'fcover'."
+            )
+        return self
+
 
 # ----------------- Options -----------------
 class Options(BaseModel):
@@ -502,6 +519,9 @@ class Options(BaseModel):
     csplus_band: Literal["cs", "cs_cdf"] = "cs"
     cs_plus_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
     clip_min_max: bool = True
+    prediction_mode: Literal["predict_then_aggregate", "composite_then_predict"] = (
+        "predict_then_aggregate"
+    )
 
     # Enforce that *no other keys* are accepted
     model_config = ConfigDict(extra="forbid")
@@ -530,6 +550,26 @@ class ConfigParams(BaseModel):
             kwargs["opt_url"] = "https://earthengine-highvolume.googleapis.com"
 
         ee.Initialize(**kwargs)
+        return self
+
+    # if mode: composite_then_predict, raise warning if bands include stdDev_within or stdDev_across, as stdDev_across will be 0; and thus stdDev = stdDev_within
+    # also count will be = 1, as only one composite is used
+    @model_validator(mode="after")
+    def warn_stddev_across_in_composite_then_predict(self):
+        if self.options.prediction_mode == "composite_then_predict":
+            if (
+                "stdDev_across" in self.variables.bands
+                or "stdDev_within" in self.variables.bands
+            ):
+                logger.warning(
+                    "Prediction mode is 'composite_then_predict', but 'stdDev_across' or 'stdDev_within' is included in bands. "
+                    "In this mode, stdDev_across will be 0, and stdDev = stdDev_within.",
+                )
+            if "count" in self.variables.bands:
+                logger.warning(
+                    "Prediction mode is 'composite_then_predict', but 'count' is included in bands. "
+                    "In this mode, count will always be 1 for pixels with valid data.",
+                )
         return self
 
     # if export.crs == "LOCAL_UTM", resolve to EPSG code based on spatial geometry and return updated instance

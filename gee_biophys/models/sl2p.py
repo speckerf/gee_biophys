@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import ee
 import numpy as np
+import xarray as xr
 from loguru import logger
 
 
@@ -280,30 +281,61 @@ def _ee_angle_transform_sl2p(angle_img: ee.Image) -> ee.Image:
 
 
 def prepare_s2_input_for_sl2p(img: ee.Image) -> ee.Image:
-    """Prepare Sentinel-2 image for SL2P model input.
-
-    Parameters
-    ----------
-    - img (ee.Image): Input Sentinel-2 image with bands and angles.
-
-    Returns
-    -------
-    - ee.Image: Image with bands ordered and angles transformed for SL2P.
-
-    """
-    # Bands/angles expected on the input S2 image
+    """Prepare Sentinel-2 image for SL2P model input."""
     _s2_bands = ["B3", "B4", "B5", "B6", "B7", "B8A", "B11", "B12"]
     _s2_angles = ["tts", "tto", "psi"]
 
-    # Output names required by SL2P (cosines first, then reflectance bands)
     _sl2p_angle_names = ["cosSZA", "cosVZA", "cosRAA"]
     _sl2p_output_order = _sl2p_angle_names + _s2_bands
 
     refl = img.select(_s2_bands)
+
     cos_angles = _ee_angle_transform_sl2p(img.select(_s2_angles)).rename(
-        _sl2p_angle_names,
+        _sl2p_angle_names
     )
 
-    out = refl.addBands(cos_angles)
+    return (
+        refl.addBands(cos_angles)
+        .select(_sl2p_output_order)
+        .copyProperties(img, img.propertyNames())
+    )
 
-    return out.select(_sl2p_output_order)
+
+def prepare_s2_imgc_for_sl2p(
+    imgc: ee.ImageCollection,
+) -> ee.ImageCollection:
+    """Prepare Sentinel-2 ImageCollection for SL2P model input."""
+    return imgc.map(prepare_s2_input_for_sl2p)
+
+
+def prepare_s2_ds_for_sl2p(ds: xr.Dataset) -> xr.Dataset:
+    """Prepare Sentinel-2 xarray Dataset for SL2P model input.
+
+    The model expects the following bands:
+    - Cosine-transformed angle features: cosSZA, cosVZA, cosRAA
+    - Sentinel-2 reflectance bands: B3, B4, B5, B6, B7, B8A, B11, B12
+    Returns
+    -------
+    - xr.Dataset: Dataset with angle bands transformed and reflectance bands selected for SL2P.
+    """
+    _s2_bands = ["B3", "B4", "B5", "B6", "B7", "B8A", "B11", "B12"]
+    _s2_angles = ["tts", "tto", "psi"]
+
+    _sl2p_angle_names = ["cosSZA", "cosVZA", "cosRAA"]
+    _sl2p_output_order = _sl2p_angle_names + _s2_bands
+
+    # Compute cosine of angles in radians
+    ds_cos_angles = np.cos(np.deg2rad(ds[_s2_angles])).rename(
+        {old: new for old, new in zip(_s2_angles, _sl2p_angle_names)}
+    )
+
+    # Select reflectance bands
+    ds_refl = ds[_s2_bands]
+
+    # Combine angle and reflectance bands
+    ds_prepared = xr.merge([ds_cos_angles, ds_refl])
+
+    # Reorder bands to match SL2P expected order
+    ds_prepared = ds_prepared[_sl2p_output_order]
+
+    return ds_prepared

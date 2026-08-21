@@ -12,8 +12,8 @@ from loguru import logger
 
 from gee_biophys.config import ConfigParams
 from gee_biophys.s2_export import export_image, merge_local_interval_exports
-from gee_biophys.s2_input import load_s2_input, load_s2_input_xarray
-from gee_biophys.s2_predict import biophys_predict, biophys_predict_local
+from gee_biophys.s2_input import convert_s2_input_to_xarray, load_s2_input
+from gee_biophys.s2_predict import biophys_predict_ee, biophys_predict_local
 from gee_biophys.utils import (
     get_system_index,
     initialize_export_location,
@@ -77,7 +77,7 @@ def run_pipeline(config: str, set_public: bool = False) -> None:
                 "Running local prediction via xee/xarray. This is not recommended for very large exports (> 100x100km area) at 20m resolution."
             )
 
-            input_ds = load_s2_input_xarray(cfg, imgc)
+            input_ds = convert_s2_input_to_xarray(cfg, imgc)
             output_ds = biophys_predict_local(cfg, input_ds)
             output_ds = update_dataset_metadata(
                 output_ds,
@@ -98,21 +98,20 @@ def run_pipeline(config: str, set_public: bool = False) -> None:
                 cfg,
                 subfolder=local_temp_subfolder,
             )
-            continue
+        else:
+            # <---- Prediction ---->
+            output_image = biophys_predict_ee(cfg, imgc)
 
-        # <---- Prediction ---->
-        output_image = biophys_predict(cfg, imgc)
+            # <---- Update metadata ---->
+            output_image = update_image_metadata(
+                output_image,
+                interval_start,
+                interval_end,
+                cfg,
+            )
 
-        # <---- Update metadata ---->
-        output_image = update_image_metadata(
-            output_image,
-            interval_start,
-            interval_end,
-            cfg,
-        )
-
-        # <---- Export  ---->
-        export_image(output_image, filename, cfg)
+            # <---- Export  ---->
+            export_image(output_image, filename, cfg)
 
     if cfg.export.destination == "xee-local":
         assert final_local_filename is not None
@@ -152,5 +151,6 @@ def run(
 
 
 if __name__ == "__main__":
-    config_path = Path("example_configs/forest-fire-bitsch-2023.yaml")
+    config_path = Path("example_configs/grounded_eo_local.yaml")
     run_pipeline(config_path, set_public=True)  # for debugging purposes
+    # app()

@@ -1,0 +1,30 @@
+spatial:
+  type: bbox # options: bbox, geojson
+  bbox: [-62, -8, -61, -7] # [minLon, minLat, maxLon, maxLat]
+  region_name: amazon-deforestation # no spaces, no underscores
+
+temporal:
+  start: "2019-01-01"
+  end:   "2025-01-01"
+  cadence:
+    type: seasons
+    start: "07-01"
+    end: "10-01"
+
+variables:
+  model: sl2p # options: s2biophys, sl2p
+  variable: fapar # laie, fapar, fcover
+
+options:
+  max_cloud_cover: 70 
+  csplus_band: 'cs' 
+  cs_plus_threshold: 0.65
+  clip_min_max: true
+
+export:
+  project_id: ee-speckerfelix
+  destination: asset # options: asset, drive, gcs
+  collection_path: projects/ee-speckerfelix/assets/custom-exports/amazon-deforestation # used if destination is asset
+  crs: LOCAL_UTM
+  scale: 100
+  max_pixels: 100_000_000_000 # 1e11
