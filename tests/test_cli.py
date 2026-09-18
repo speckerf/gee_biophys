@@ -21,6 +21,7 @@ def load_params(path: str) -> ConfigParams:
         "example_configs/minimal_example.yaml",
         "example_configs/bimonthly-zambia.yaml",
         "example_configs/seasonal-summer-zurich.yaml",
+        "example_configs/seasonal-zambia-arid_shrubland.yaml",
     ],
 )
 def test_cli(ee_init, config_path):
@@ -35,8 +36,17 @@ def test_cli(ee_init, config_path):
             model=cfg.variables.model,
             input_imgc=imgc,
             clip_min_max=True,
+            biome_lc_name=cfg.variables.biome_lc_name,
         )
         output_image.getInfo()  # force evaluation to catch errors
+
+        # sample a single pixel to check that the output is reasonable
+        output_image.sample(
+            region=cfg.spatial.ee_geometry,
+            scale=20,
+            numPixels=1,
+            geometries=True,
+        ).first().getInfo()  # force evaluation to catch errors
         break
 
 

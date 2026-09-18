@@ -17,13 +17,12 @@ def export_image(
 ):
     loc = cfg.export.destination
 
-    if (
-        loc != "xee-local"
-        and cfg.spatial.type == "geojson"
-        and cfg.spatial.geojson_clip
+    if loc != "xee-local" and (
+        cfg.spatial.type == "square"
+        or (cfg.spatial.type == "geojson" and cfg.spatial.geojson_clip)
     ):
         logger.debug(
-            "Clipping export image to GeoJSON geometry bounds. Please be aware of potential issues with complex geometries. Set 'geojson_clip' to false to disable.",
+            "Clipping export image to the requested spatial geometry.",
         )
         image = image.clip(cfg.spatial.ee_geometry)
 

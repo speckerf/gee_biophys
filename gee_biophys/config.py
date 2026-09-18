@@ -18,11 +18,17 @@ from pydantic import (
     model_validator,
 )
 
+from gee_biophys.model_variants import GROUP_NAME_TO_GROUP_NUM
+
 
 # ----------------- Spatial -----------------
 class Spatial(BaseModel):
-    type: Literal["bbox", "geojson"]
+    type: Literal["bbox", "geojson", "square"]
     bbox: list[float] | None = None  # [minx, miny, maxx, maxy]
+    square_center: list[float] | None = None  # [lon, lat]
+    square_length: float | None = Field(
+        default=None, gt=0, allow_inf_nan=False
+    )  # metres
     geojson_path: str | None = None
     region_name: str | None = (
         None  # optional name for the region (no spaces/underscores)
@@ -39,6 +45,7 @@ class Spatial(BaseModel):
     def check_inputs(self):
         has_bbox = self.bbox is not None
         has_geo = self.geojson_path is not None
+        has_square = self.square_center is not None or self.square_length is not None
         has_region_name = self.region_name is not None
 
         if has_region_name:
@@ -49,9 +56,10 @@ class Spatial(BaseModel):
                 )
 
         # exactly one must be provided
-        if has_bbox == has_geo:
+        if sum((has_bbox, has_geo, has_square)) != 1:
             raise ValueError(
-                "Specify exactly one of 'bbox' or 'geojson_path', not both.",
+                "Specify exactly one of 'bbox', 'geojson_path', or "
+                "the pair 'square_center' and 'square_length'.",
             )
 
         if self.type == "bbox":
@@ -83,6 +91,22 @@ class Spatial(BaseModel):
             # quick JSON check
             json.loads(p.read_text(encoding="utf-8"))
 
+        elif self.type == "square":
+            if self.square_center is None:
+                raise ValueError("When type='square', 'square_center' is required.")
+            if self.square_length is None:
+                raise ValueError("When type='square', 'square_length' is required.")
+            if len(self.square_center) != 2:
+                raise ValueError("square_center must contain two numbers: [lon, lat].")
+            lon, lat = self.square_center
+            if not (math.isfinite(lon) and math.isfinite(lat)):
+                raise ValueError("square_center coordinates must be finite.")
+            if not (-180 <= lon <= 180 and -80 <= lat <= 84):
+                raise ValueError(
+                    "square_center must have longitude in [-180, 180] and "
+                    "latitude in the UTM range [-80, 84]."
+                )
+
         return self
 
     @cached_property
@@ -90,6 +114,20 @@ class Spatial(BaseModel):
         """Return an ee.Geometry derived from this spatial definition."""
         if self.type == "bbox":
             return ee.Geometry.BBox(*self.bbox)
+        if self.type == "square":
+            lon, lat = self.square_center
+            utm = f"EPSG:{_latlon_to_utm_epsg(lat, lon)}"
+            center = ee.Geometry.Point([lon, lat]).transform(utm, 0.01).coordinates()
+            x, y = ee.Number(center.get(0)), ee.Number(center.get(1))
+            half = self.square_length / 2
+            square = ee.Geometry.Rectangle(
+                [x.subtract(half), y.subtract(half), x.add(half), y.add(half)],
+                proj=utm,
+                geodesic=False,
+            )
+            # Transform the polygon, not its lon/lat bounding box: its sides
+            # remain square_length metres in the centre's local UTM grid.
+            return square.transform("EPSG:4326", 0.01)
         if self.type == "geojson":
             with open(self.geojson_path, encoding="utf-8") as f:
                 obj = json.load(f)
@@ -407,7 +445,7 @@ class ExportOpts(BaseModel):
     project_id: str | None = None  # GEE project ID for exports
     filename_prefix: str = "biophys"
     crs: str  # e.g. "EPSG:4326" / or specify LOCAL_UTM (automatic)
-    scale: PositiveInt | None = None  # meters
+    scale: PositiveInt  # meters: required
     max_pixels: int = Field(default=100_000_000_000, ge=1)
 
     # Enforce that *no other keys* are accepted
@@ -454,7 +492,7 @@ def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
         - Southern Hemisphere: 32701 to 32760
     """
     long_temp = lon
-    zone_number = math.floor((long_temp + 180) / 6) + 1
+    zone_number = min(60, math.floor((long_temp + 180) / 6) + 1)
 
     # Special case for Norway
     if 56.0 <= lat < 64.0 and 3.0 <= long_temp < 12.0:
@@ -482,8 +520,13 @@ def _latlon_to_utm_epsg(lat: float, lon: float) -> int:
 
 # ----------------- Variables -----------------
 class Variables(BaseModel):
-    model: Literal["s2biophys", "sl2p", "groundedeo"] = "s2biophys"
+    model: Literal["s2biophys", "sl2p", "groundedeo", "s2biophys-biome-lc-specific"] = (
+        "s2biophys"
+    )
     variable: Literal["lai", "laie", "fapar", "fcover"] = "laie"
+    biome_lc_name: str | None = (
+        None  # optional; only used for s2biophys-biome-lc-specific
+    )
     bands: list[
         Literal["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
     ] = ["mean", "stdDev", "stdDev_within", "stdDev_across", "count"]
@@ -502,14 +545,24 @@ class Variables(BaseModel):
                 "When model='groundedeo', variable must be one of: 'lai', 'fapar'. "
                 "Grounded EO only supports LAI and FAPAR."
             )
-        if self.model == "s2biophys" and self.variable not in {
-            "laie",
-            "fapar",
-            "fcover",
-        }:
+        if self.model in {
+            "s2biophys",
+            "s2biophys-biome-lc-specific",
+        } and self.variable not in {"laie", "fapar", "fcover"}:
             raise ValueError(
-                "When model='s2biophys', variable must be one of: 'laie', 'fapar', 'fcover'."
+                f"When model='{self.model}', variable must be one of: 'laie', 'fapar', 'fcover'."
             )
+        if self.model == "s2biophys-biome-lc-specific":
+            if self.biome_lc_name not in GROUP_NAME_TO_GROUP_NUM:
+                raise ValueError(
+                    "When model='s2biophys-biome-lc-specific', biome_lc_name must "
+                    f"be one of: {', '.join(GROUP_NAME_TO_GROUP_NUM)}."
+                )
+        elif self.biome_lc_name is not None:
+            raise ValueError(
+                "biome_lc_name is only valid for model='s2biophys-biome-lc-specific'."
+            )
+
         return self
 
 
@@ -578,9 +631,12 @@ class ConfigParams(BaseModel):
         if self.export.crs != "LOCAL_UTM":
             return self  # Return self if no change is made
 
-        geom = self.spatial.ee_geometry
-        centroid = geom.centroid(1).coordinates().getInfo()
-        lon, lat = centroid[0], centroid[1]
+        if self.spatial.type == "square":
+            lon, lat = self.spatial.square_center
+        else:
+            geom = self.spatial.ee_geometry
+            centroid = geom.centroid(1).coordinates().getInfo()
+            lon, lat = centroid[0], centroid[1]
         epsg_code = _latlon_to_utm_epsg(lat, lon)
 
         # **This line is necessary to persist the change**

@@ -1,0 +1,40 @@
+{
+  "study_name": "veg-v1-laie-group6-fold0-mlp",
+  "trait": "laie",
+  "group_id": 6,
+  "fold_id": 0,
+  "best_trial_number": 1068,
+  "best_trial_value": 0.6060915120334088,
+  "n_complete_trials": 1500,
+  "optuna_params": {
+    "transform_target": "standard",
+    "nirv_norm": true,
+    "num_spectra_optuna": 2,
+    "parameter_setup": "snap_atbd_mod",
+    "lai_mean": 1.2000000000000002,
+    "lai_std": 1.0,
+    "additive_noise_optuna": 3,
+    "multiplicative_noise_optuna": 6,
+    "rsoil_emit_insitu": "insitu",
+    "rsoil_fraction_optuna": 1,
+    "p_baresoil_insitu_optuna": 1,
+    "p_baresoil_s2_optuna": 1,
+    "p_baresoil_emit_optuna": 2,
+    "p_urban_s2_optuna": 2,
+    "p_snowice_s2_optuna": 1
+  },
+  "n_samples_simulated": 5075,
+  "n_samples_val_train": 1342,
+  "n_samples_val_test": 692,
+  "val_scores": {
+    "train_rmse": 0.606091512033408,
+    "test_rmse": 0.7315701724033701,
+    "train_mae": 0.4854904491299739,
+    "test_mae": 0.5881848448494283,
+    "train_me": -0.0600932534197741,
+    "test_me": -0.5351359306309794,
+    "train_r2": 0.5601832446300419,
+    "test_r2": 0.2489807702820852,
+    "test_r2_oos": 0.5754735739877912
+  }
+}

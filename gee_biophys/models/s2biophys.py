@@ -12,6 +12,7 @@ import pandas as pd
 import xarray as xr
 from sklearn.pipeline import Pipeline
 
+from gee_biophys.model_variants import GROUP_NAME_TO_GROUP_NUM
 from gee_biophys.models.utils_s2biophys import (
     eeMinMaxRangeMasker,
     eeMLPRegressor,
@@ -447,24 +448,108 @@ def load_model_ensemble(
         )
         models[name] = item
 
-    # load uncertainty calibration parameters
-    calibration_model_path = (
-        base / f"calibration_uncertainty_model_{trait}_s2biophys_v02.pkl"
-    )
+    # Recalibration uses the portable y_pred -> tau lookup table.  Older
+    # releases also unpickled a fitted SciPy spline here, even though no
+    # prediction path consumed it.  Such pickles are tied to SciPy's internal
+    # representation and can fail to load with newer SciPy/Python versions.
     calibration_table_path = (
         base / f"calibration_uncertainty_table_{trait}_s2biophys_v02.csv"
     )
 
-    if not calibration_model_path.is_file() or not calibration_table_path.is_file():
+    if not calibration_table_path.is_file():
         raise FileNotFoundError(
-            f"Missing uncertainty calibration files for trait '{trait}'. "
+            f"Missing uncertainty calibration table for trait '{trait}'. "
             "Ensure they are included via [tool.setuptools.package-data].",
         )
 
-    calibration_model = _open_pickle(calibration_model_path)
     calibration_table = pd.read_csv(calibration_table_path)
 
-    return models, (calibration_model, calibration_table)  # type: ignore
+    # Keep the established return shape for downstream callers.  The first
+    # element was never used; None makes that explicit without breaking API.
+    return models, (None, calibration_table)  # type: ignore
+
+
+def load_biome_land_cover_specific_model_ensemble(
+    trait: str,
+    biome_lc_name: str,
+) -> Tuple[Dict[str, EnsembleItem], Tuple[Any, pd.DataFrame]]:
+    """Load three ensemble members by variant name; group numbers are internal."""
+    if (
+        not isinstance(biome_lc_name, str)
+        or biome_lc_name not in GROUP_NAME_TO_GROUP_NUM
+    ):
+        raise ValueError(
+            f"Invalid biome_lc_name {biome_lc_name!r}. Must be one of: "
+            f"{', '.join(GROUP_NAME_TO_GROUP_NUM)}"
+        )
+    if trait not in {"laie", "fapar", "fcover"}:
+        raise ValueError("trait must be one of: laie, fapar, fcover")
+    biome_lc_num = GROUP_NAME_TO_GROUP_NUM[biome_lc_name]
+
+    base = (
+        files("gee_biophys.models.s2biophys_biome_land_cover_specific_params") / trait
+    )
+    base_std_recalibration = files("gee_biophys.models.s2biophys_params") / trait
+
+    if not base.is_dir():
+        raise FileNotFoundError(
+            f"Packaged models for trait '{trait}' not found at {base}. "
+            "Ensure files are included via [tool.setuptools.package-data].",
+        )
+
+    ensemble_size = 3  # fixed for biome/land-cover specific s2biophys v1
+    models: Dict[str, EnsembleItem] = {}
+
+    for t in range(ensemble_size):
+        name = f"veg-v1-{trait}-group{biome_lc_num}-fold{t}-mlp"
+
+        pipeline_path = base / f"model_{name}.pkl"
+        config_path = base / f"model_{name}_config.json"
+
+        required = {
+            "pipeline": pipeline_path,
+            "config": config_path,
+        }
+
+        missing = [k for k, p in required.items() if not p.is_file()]
+        if missing:
+            # Give a helpful, actionable error
+            details = "\n".join(f"  - {k}: {required[k]}" for k in missing)
+            raise FileNotFoundError(
+                f"Missing required model files for '{name}':\n{details}\n"
+                "Make sure they are packaged and names match the expected pattern.",
+            )
+
+        item = EnsembleItem(
+            config=_open_json(config_path),
+            pipeline=_open_pickle(pipeline_path),
+            model_path=pipeline_path.with_suffix("").name,
+            min_max_bands=None,
+            min_max_label=None,
+            split=None,
+        )
+        models[name] = item
+
+    # Recalibration uses the portable y_pred -> tau lookup table.  Older
+    # releases also unpickled a fitted SciPy spline here, even though no
+    # prediction path consumed it.  Such pickles are tied to SciPy's internal
+    # representation and can fail to load with newer SciPy/Python versions.
+    calibration_table_path = (
+        base_std_recalibration
+        / f"calibration_uncertainty_table_{trait}_s2biophys_v02.csv"
+    )
+
+    if not calibration_table_path.is_file():
+        raise FileNotFoundError(
+            f"Missing uncertainty calibration table for trait '{trait}'. "
+            "Ensure they are included via [tool.setuptools.package-data].",
+        )
+
+    calibration_table = pd.read_csv(calibration_table_path)
+
+    # Keep the established return shape for downstream callers.  The first
+    # element was never used; None makes that explicit without breaking API.
+    return models, (None, calibration_table)  # type: ignore
 
 
 def prepare_s2_img_for_s2biophys(img: ee.Image) -> ee.Image:

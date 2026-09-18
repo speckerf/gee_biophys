@@ -1,0 +1,30 @@
+# Saguaro west, Arizona: Sonoran desert shrubland.
+# The selected ensemble predicts the full region; no vegetation-class mask.
+spatial:
+  type: square
+  square_center: [-110.700, 32.180]
+  square_length: 5000
+  region_name: saguaro-east
+temporal:
+  start: '2024-01-01'
+  end: '2024-12-31'
+  cadence:
+    type: seasons
+    start: "08-15"
+    end:   "09-16"
+variables:
+  model: s2biophys-biome-lc-specific
+  biome_lc_name: arid_shrubland
+  variable: fapar
+  bands:
+  - mean
+  - stdDev
+  - count
+options:
+  max_cloud_cover: 50
+  cs_plus_threshold: 0.65
+export:
+  destination: drive
+  folder: gee-biophys-variants
+  crs: LOCAL_UTM
+  scale: 20

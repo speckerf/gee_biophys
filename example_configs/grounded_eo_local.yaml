@@ -26,7 +26,6 @@ export:
   filename_prefix: "groundedeo"
   crs: "LOCAL_UTM"
   scale: 20
-  max_pixels: 100_000_000_000
 
 options:
   max_cloud_cover: 30

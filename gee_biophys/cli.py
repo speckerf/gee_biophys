@@ -78,7 +78,14 @@ def run_pipeline(config: str, set_public: bool = False) -> None:
             )
 
             input_ds = convert_s2_input_to_xarray(cfg, imgc)
-            output_ds = biophys_predict_local(cfg, input_ds)
+            output_ds = biophys_predict_local(
+                input_ds,
+                variable=cfg.variables.variable,
+                model=cfg.variables.model,
+                clip_min_max=cfg.options.clip_min_max,
+                biome_lc_name=cfg.variables.biome_lc_name,
+            )
+            # output_ds = biophys_predict_local(cfg, input_ds)
             output_ds = update_dataset_metadata(
                 output_ds,
                 interval_start,
@@ -100,7 +107,13 @@ def run_pipeline(config: str, set_public: bool = False) -> None:
             )
         else:
             # <---- Prediction ---->
-            output_image = biophys_predict_ee(cfg, imgc)
+            output_image = biophys_predict_ee(
+                input_imgc=imgc,
+                variable=cfg.variables.variable,
+                model=cfg.variables.model,
+                clip_min_max=cfg.options.clip_min_max,
+                biome_lc_name=cfg.variables.biome_lc_name,
+            )
 
             # <---- Update metadata ---->
             output_image = update_image_metadata(
@@ -151,6 +164,7 @@ def run(
 
 
 if __name__ == "__main__":
-    config_path = Path("example_configs/grounded_eo_local.yaml")
+    # config_path = Path("example_configs/grounded_eo_local.yaml")
+    config_path = Path("example_configs/seasonal-zambia-arid_shrubland.yaml")
     run_pipeline(config_path, set_public=True)  # for debugging purposes
     # app()

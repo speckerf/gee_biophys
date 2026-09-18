@@ -88,7 +88,7 @@ def test_safe_ymd_handles_leap_day_only():
 )
 def test_export_destination_requires_matching_field(kwargs, message):
     with pytest.raises(ValidationError, match=message):
-        ExportOpts(crs="EPSG:4326", **kwargs)
+        ExportOpts(crs="EPSG:4326", scale=20, **kwargs)
 
 
 def test_export_rejects_invalid_crs():

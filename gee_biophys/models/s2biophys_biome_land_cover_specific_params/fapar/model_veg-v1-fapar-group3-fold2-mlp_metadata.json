@@ -1,0 +1,40 @@
+{
+  "study_name": "veg-v1-fapar-group3-fold2-mlp",
+  "trait": "fapar",
+  "group_id": 3,
+  "fold_id": 2,
+  "best_trial_number": 819,
+  "best_trial_value": 0.03411491240772289,
+  "n_complete_trials": 1500,
+  "optuna_params": {
+    "transform_target": "None",
+    "nirv_norm": true,
+    "num_spectra_optuna": 1,
+    "parameter_setup": "foliar_codistribution_mod",
+    "lai_mean": 3.6,
+    "lai_std": 3.2,
+    "additive_noise_optuna": 1,
+    "multiplicative_noise_optuna": 7,
+    "rsoil_emit_insitu": "insitu",
+    "rsoil_fraction_optuna": 1,
+    "p_baresoil_insitu_optuna": 5,
+    "p_baresoil_s2_optuna": 2,
+    "p_baresoil_emit_optuna": 1,
+    "p_urban_s2_optuna": 8,
+    "p_snowice_s2_optuna": 2
+  },
+  "n_samples_simulated": 2724,
+  "n_samples_val_train": 547,
+  "n_samples_val_test": 402,
+  "val_scores": {
+    "train_rmse": 0.03411491240772243,
+    "test_rmse": 0.02523817318243756,
+    "train_mae": 0.019525257398210906,
+    "test_mae": 0.017279985246526124,
+    "train_me": -0.001496366788116894,
+    "test_me": -0.01006405511035287,
+    "train_r2": 0.7067290138055029,
+    "test_r2": -1.092945704898435,
+    "test_r2_oos": 0.253496451999646
+  }
+}

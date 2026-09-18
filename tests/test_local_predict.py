@@ -178,6 +178,27 @@ def test_biophys_predict_local_s2biophys_uncertainty_calibration(
     assert out["laie_count"].item() == 2
 
 
+def test_model_loader_does_not_unpickle_legacy_calibration_model(monkeypatch):
+    from gee_biophys.models import s2biophys
+
+    real_open_pickle = s2biophys._open_pickle
+    opened_paths = []
+
+    def recording_open_pickle(path):
+        opened_paths.append(path.name)
+        return real_open_pickle(path)
+
+    monkeypatch.setattr(s2biophys, "_open_pickle", recording_open_pickle)
+
+    _, (calibration_model, calibration_table) = s2biophys.load_model_ensemble("fapar")
+
+    assert calibration_model is None
+    assert {"y_pred", "tau"}.issubset(calibration_table.columns)
+    assert len(opened_paths) == 5
+    assert all(path.startswith("model_optuna-") for path in opened_paths)
+    assert not any("calibration_uncertainty_model" in path for path in opened_paths)
+
+
 def test_calibrated_stddev_is_aggregated_into_total_uncertainty():
     means = np.array(
         [0.2, 0.5, 0.9],

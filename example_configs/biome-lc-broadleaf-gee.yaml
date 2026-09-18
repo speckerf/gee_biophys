@@ -1,0 +1,30 @@
+# Lägeren, Switzerland: temperate broadleaf forest.
+# The selected ensemble predicts the full region; no vegetation-class mask.
+spatial:
+  type: square
+  square_center: [8.405, 47.48]
+  square_length: 5000
+  region_name: laegern
+temporal:
+  start: '2024-01-01'
+  end: '2024-12-31'
+  cadence:
+    type: seasons
+    start: "06-01"
+    end:   "08-01"
+variables:
+  model: s2biophys-biome-lc-specific
+  biome_lc_name: temperate_broadleaf_forest
+  variable: fapar
+  bands:
+  - mean
+  - stdDev
+  - count
+options:
+  max_cloud_cover: 50
+  cs_plus_threshold: 0.65
+export:
+  destination: drive
+  folder: gee-biophys-variants
+  crs: LOCAL_UTM
+  scale: 20

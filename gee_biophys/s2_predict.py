@@ -9,6 +9,7 @@ from gee_biophys.models.grounded_eo import (
 )
 from gee_biophys.models.s2biophys import (
     eeEnsemblePredictSingleImg,
+    load_biome_land_cover_specific_model_ensemble,
     load_model_ensemble,
     prepare_s2_ds_for_s2biophys,
     prepare_s2_imgc_for_s2biophys,
@@ -212,12 +213,23 @@ def _aggregate_prediction_times(
 def _predict_local_s2biophys(
     input_ds: xr.Dataset,
     variable: str,
+    global_model: bool = True,
     clip_min_max: bool = True,
+    biome_lc_name: str | None = None,
 ) -> xr.Dataset:
-    (
-        s2biophys_model_ensemble,
-        (_, uncertainty_calibration_table),
-    ) = load_model_ensemble(variable)
+    if not global_model:
+        (
+            s2biophys_model_ensemble,
+            (_, uncertainty_calibration_table),
+        ) = load_biome_land_cover_specific_model_ensemble(
+            variable,
+            biome_lc_name=biome_lc_name,
+        )
+    else:
+        (
+            s2biophys_model_ensemble,
+            (_, uncertainty_calibration_table),
+        ) = load_model_ensemble(variable)
 
     matrix, (arr, non_time_dims, full_shape) = _dataset_to_matrix(input_ds)
     valid = np.all(np.isfinite(matrix), axis=1)
@@ -478,6 +490,7 @@ def biophys_predict_ee(
     model: str,
     input_imgc: ee.ImageCollection,
     clip_min_max: bool,
+    biome_lc_name: str | None = None,
 ) -> ee.Image:
     """Apply the selected biophysical model to the input Sentinel-2 ImageCollection
     and return an ImageCollection with predicted biophysical variables.
@@ -503,8 +516,35 @@ def biophys_predict_ee(
         input_imgc = prepare_s2_imgc_for_s2biophys(input_imgc)
         (
             s2biophys_model_ensemble,
-            (uncertainty_calibration_model, uncertainty_calibration_table),
+            (_, uncertainty_calibration_table),
         ) = load_model_ensemble(variable)
+
+        imgc_preds = input_imgc.map(
+            lambda img: eeEnsemblePredictSingleImg(
+                ensemble=s2biophys_model_ensemble,
+                img=img,
+                variable=variable,
+                calibrate_uncertainty=True,
+                uncertainty_calibration_table=uncertainty_calibration_table,
+            )
+        )
+        # reduce to mean / stdDev_across-images / stdDev_within-images per group
+        output_image = reduce_ensemble_preds(
+            imgc_preds,
+            variable,
+        )
+
+        water_mask_2020 = ee.ImageCollection("ESA/WorldCover/v200").first()
+        output_image = output_image.updateMask(water_mask_2020.neq(80))
+
+    elif model == "s2biophys-biome-lc-specific":
+        input_imgc = prepare_s2_imgc_for_s2biophys(input_imgc)
+        (
+            s2biophys_model_ensemble,
+            (_, uncertainty_calibration_table),
+        ) = load_biome_land_cover_specific_model_ensemble(
+            variable, biome_lc_name=biome_lc_name
+        )
 
         imgc_preds = input_imgc.map(
             lambda img: eeEnsemblePredictSingleImg(
@@ -527,10 +567,10 @@ def biophys_predict_ee(
     else:
         raise ValueError(f"Unsupported model: {model}")
 
-    # select only desired output bands
-    # output_band_names = [f"{variable}_{band}" for band in cfg.variables.bands]
-
-    # return output_image.select(output_band_names)
+    if model in {"s2biophys", "s2biophys-biome-lc-specific"} and clip_min_max:
+        upper = 8 if variable == "laie" else 1
+        mean = output_image.select(f"{variable}_mean").clamp(0, upper)
+        output_image = output_image.addBands(mean, overwrite=True)
     return output_image
 
 
@@ -539,6 +579,7 @@ def biophys_predict_local(
     variable: str,
     model: str,
     clip_min_max: bool = True,
+    biome_lc_name: str | None = None,
 ) -> xr.Dataset:
     """Run local biophysical prediction from an xarray Dataset.
 
@@ -559,6 +600,15 @@ def biophys_predict_local(
         input_ds = prepare_s2_ds_for_groundedeo(input_ds)
         output_ds = _predict_local_grounded_eo(
             input_ds, variable=variable, clip_min_max=clip_min_max
+        )
+    elif model == "s2biophys-biome-lc-specific":
+        input_ds = prepare_s2_ds_for_s2biophys(input_ds)
+        output_ds = _predict_local_s2biophys(
+            input_ds,
+            variable=variable,
+            global_model=False,
+            clip_min_max=clip_min_max,
+            biome_lc_name=biome_lc_name,
         )
     else:
         raise ValueError(f"Unsupported model: {model}")

@@ -74,9 +74,9 @@ def update_image_metadata(
         ee.Image: The image with updated metadata.
         ["system:time_start", "system:time_end", "model", "variable", "export_scale", "output_crs", "system:index"]
 
-        # selects the bands in cfg.export.output_bands, and renames them to the names in cfg.export.output_bands
+        # selects the bands in cfg.variables.bands, and renames them to the names in cfg.variables.bands, e.g. ["lai_mean", "lai_stdDev", "lai_stdDev_within", "lai_stdDev_across", "lai_count"]
 
-        # system:index follows filenaming convention: [variable]_[model]_[output_bands (joined by '-')]_[output_resolution]m_s_[startdate(YYYYMMDD)]_[enddate(YYYYMMDD)]_[tile]_[crs(epsg lower and swap : with .)]_[version]
+        # system:index follows filenaming convention: [variable]_[model]_[bands (joined by '-')]_[output_resolution]m_s_[startdate(YYYYMMDD)]_[enddate(YYYYMMDD)]_[tile]_[crs(epsg lower and swap : with .)]_[version]
 
     """
     index_str = get_system_index(cfg, interval_start, interval_end)
@@ -96,7 +96,7 @@ def update_image_metadata(
         },
     )
 
-    bandnames = [f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands]
+    bandnames = [f"{cfg.variables.variable}_{band}" for band in cfg.variables.bands]
     return updated_image.select(bandnames)
 
 
@@ -124,9 +124,7 @@ def update_dataset_metadata(
         }
     )
 
-    band_names = [
-        f"{cfg.variables.variable}_{band}" for band in cfg.export.output_bands
-    ]
+    band_names = [f"{cfg.variables.variable}_{band}" for band in cfg.variables.bands]
 
     return ds.assign_attrs(attrs)[band_names]
 

@@ -3,10 +3,13 @@
 # ==============================================
 
 spatial:
-  # Choose exactly ONE input: 'bbox' OR 'geojson'
-  type: bbox                      # options: bbox, geojson
+  # Choose exactly ONE input: 'bbox', 'geojson', or 'square'.
+  type: bbox                      # options: bbox, geojson, square
   bbox: [7.1, 46.1, 7.2, 46.2]    # [minLon(minx), minLat(miny), maxLon(maxy)]
   # geojson_path: "path/to/area.geojson"   # (use if type == geojson; .geojson/.json)
+  # For type: square, replace bbox with both:
+  # square_center: [8.4, 47.48]      # [longitude, latitude]
+  # square_length: 2000             # side length in local UTM metres, independent of export.crs
   region_name: my-region          # optional; no spaces or underscores
   # geojson_clip: false             # if type == geojson: clip to geometry bounds when true
 
@@ -30,7 +33,9 @@ temporal:
     # end:   "03-15"              # MM-DD (zero-padded)
 
 variables:
-  model: s2biophys                # options: s2biophys, sl2p, groundedeo
+  model: s2biophys                # options: s2biophys, sl2p, groundedeo, s2biophys-biome-lc-specific
+  # biome_lc_name: temperate_broadleaf_forest # required for s2biophys-biome-lc-specific; names only
+  # The selected variant predicts the full scene, without a vegetation-class mask.
   variable: laie                  # options: lai, laie, fapar, fcover
   bands: [mean, stdDev, stdDev_within, stdDev_across, count]    # allowed: mean, stdDev, stdDev_within, stdDev_across, count / bandnames will be {variable}_{band} / by default (recommended): [mean, stdDev, stdDev_within, stdDev_across, count]
 

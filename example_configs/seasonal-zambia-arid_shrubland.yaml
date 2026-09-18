@@ -1,0 +1,32 @@
+spatial:
+  type: bbox # options: bbox, geojson
+  bbox: [31.55, -13.0, 31.6, -12.95] # [minLon, minLat, maxLon, maxLat]
+  region_name: luangwa-zambia # no spaces, no underscores
+
+temporal:
+  start: "2019-01-01"
+  end:   "2024-01-01"
+  cadence:
+    type: seasons
+    start: "01-01"
+    end:   "03-31"
+
+variables:
+  model: s2biophys-biome-lc-specific # options: s2biophys, sl2p
+  biome_lc_name: arid_shrubland # biome name (string) for s2biophys-biome-lc-specific
+  variable: fapar # laie, fapar, fcover
+  bands: [mean, stdDev, stdDev_within, stdDev_across, count]    # allowed: mean, stdDev, stdDev_within, stdDev_across, count / bandnames will be {variable}_{band} / by default (recommended): [mean, stdDev, stdDev_within, stdDev_across, count]
+
+options:
+  max_cloud_cover: 50 
+  csplus_band: 'cs' 
+  cs_plus_threshold: 0.65
+  clip_min_max: true
+
+export:
+  destination: xee-local
+  folder: "exports/gee-biophys-zambia-arid_shrubland"
+  filename_prefix: "s2biophys-arid-shrubland"
+  crs: "LOCAL_UTM"
+  scale: 20
+  # max_pixels: 100_000_000_000 # 1e11

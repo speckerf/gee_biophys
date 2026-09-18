@@ -220,6 +220,10 @@ def convert_s2_input_to_xarray(
             s2_imgc.get("system:time_end"),
         )
 
+    if cfg.spatial.type == "square":
+        # Raster grids are rectangular; mask the corners outside the transformed square.
+        s2_imgc = s2_imgc.map(lambda image: image.clip(cfg.spatial.ee_geometry))
+
     return xr.open_dataset(
         s2_imgc,
         engine="ee",

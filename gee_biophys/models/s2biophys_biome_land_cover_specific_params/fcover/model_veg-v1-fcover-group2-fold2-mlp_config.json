@@ -1,0 +1,56 @@
+{
+  "optuna_study_name": "veg-v1-(TRAIT)-group(GROUP)-fold(FOLD)-(MODEL)",
+  "optuna_storage": "mysql://root@127.0.0.1:3308/oemc_supp_05",
+  "optuna_report_thresh": {
+    "fcover": 2.0,
+    "fapar": 2.0,
+    "laie": 5
+  },
+  "mlp_grid": {
+    "hidden_layer_sizes": [
+      "5",
+      "10",
+      "5_5",
+      "10_5"
+    ],
+    "activation": [
+      "tanh",
+      "relu"
+    ],
+    "learning_rate": [
+      "constant",
+      "adaptive"
+    ],
+    "alpha": [
+      0.0001,
+      0.001,
+      0.01,
+      0.1
+    ],
+    "max_iter": [
+      5000
+    ]
+  },
+  "model_version": "v02",
+  "model": "mlp",
+  "optuna_n_trials": 1500,
+  "optuna_n_startup_trials": 600,
+  "trait": "fcover",
+  "transform_target": "logit",
+  "nirv_norm": true,
+  "p_baresoil_insitu": 0.08,
+  "p_baresoil_s2": 0.0,
+  "p_baresoil_emit": 0.0,
+  "p_urban_s2": 0.005,
+  "p_snowice_s2": 0.009999999999999998,
+  "num_spectra": 2500,
+  "parameter_setup": "snap_atbd_mod",
+  "lai_min": 0.0,
+  "lai_max": 15.0,
+  "lai_mean": 1.4000000000000001,
+  "lai_std": 3.0000000000000004,
+  "additive_noise": 0.005,
+  "multiplicative_noise": 0.0,
+  "rsoil_emit_insitu": "emit",
+  "rsoil_fraction": 0.1
+}

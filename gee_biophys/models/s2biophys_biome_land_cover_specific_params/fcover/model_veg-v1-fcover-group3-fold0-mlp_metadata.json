@@ -1,0 +1,40 @@
+{
+  "study_name": "veg-v1-fcover-group3-fold0-mlp",
+  "trait": "fcover",
+  "group_id": 3,
+  "fold_id": 0,
+  "best_trial_number": 1119,
+  "best_trial_value": 0.019140656355648007,
+  "n_complete_trials": 1500,
+  "optuna_params": {
+    "transform_target": "logit",
+    "nirv_norm": true,
+    "num_spectra_optuna": 4,
+    "parameter_setup": "foliar_codistribution_mod",
+    "lai_mean": 0.8,
+    "lai_std": 3.4000000000000004,
+    "additive_noise_optuna": 1,
+    "multiplicative_noise_optuna": 10,
+    "rsoil_emit_insitu": "emit",
+    "rsoil_fraction_optuna": 4,
+    "p_baresoil_insitu_optuna": 7,
+    "p_baresoil_s2_optuna": 1,
+    "p_baresoil_emit_optuna": 2,
+    "p_urban_s2_optuna": 1,
+    "p_snowice_s2_optuna": 1
+  },
+  "n_samples_simulated": 10700,
+  "n_samples_val_train": 674,
+  "n_samples_val_test": 275,
+  "val_scores": {
+    "train_rmse": 0.01914065635564772,
+    "test_rmse": 0.04865647408806746,
+    "train_mae": 0.006295445071458685,
+    "test_mae": 0.029755698582217386,
+    "train_me": 0.003602710586448355,
+    "test_me": 0.027898348145312602,
+    "train_r2": 0.8325603058451948,
+    "test_r2": 0.0159453431343749,
+    "test_r2_oos": 0.21055901080266493
+  }
+}

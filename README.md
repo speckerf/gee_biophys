@@ -32,7 +32,7 @@ Each export includes:
 ## Features
 
 - Flexible temporal definitions: fixed (e.g. monthly, quarterly) or custom seasonal windows
-- Spatial inputs via bounding box or GeoJSON geometry
+- Spatial inputs via bounding box, GeoJSON geometry, or a square defined in metres
 - Modular YAML configuration for reproducibility
 - Exports directly to **Google Earth Engine assets**, **Google Drive**, or **Google Cloud Storage**
 - Available as both a **Python package** and **CLI tool**
@@ -153,6 +153,32 @@ options:
 version: "v02"
 ```
 
+### Square regions
+
+```yaml
+spatial:
+  type: square
+  square_center: [8.4, 47.48]  # longitude, latitude
+  square_length: 2000         # side length in metres
+```
+
+The square is centred and aligned in local UTM, then transformed to longitude/latitude. Its size is independent of `export.crs`, including `EPSG:4326`. Use this pair instead of `bbox` or `geojson_path`; the centre must be within UTM latitudes (80°S–84°N).
+
+### Biome/land-cover-specific s2biophys
+
+Choose a named, independently optimized three-member ensemble for GEE or `xee-local`:
+
+```yaml
+variables:
+  model: s2biophys-biome-lc-specific
+  biome_lc_name: temperate_broadleaf_forest
+  variable: fapar  # laie, fapar, or fcover
+```
+
+Names: `cold_evergreen_forest`, `open_tundra`, `arid_shrubland`, `temperate_nonforest`, `temperate_broadleaf_forest`, `temperate_evergreen_forest`, `tropical_forest`, `mediterranean_forest`. Numeric selectors are not accepted. The selected ensemble predicts the **full scene**, without masking to its vegetation class; normal input/cloud masks still apply (and the GEE path retains its water mask). Uncertainty currently reuses the global calibration table.
+
+Small examples: [broadleaf / GEE](example_configs/biome-lc-broadleaf-gee.yaml), [shrubland / GEE](example_configs/biome-lc-shrubland-gee.yaml), [nonforest / xee-local](example_configs/biome-lc-nonforest-local.yaml). Compare both models in the [executed notebook](notebooks/biome_lc_model_comparison.ipynb).
+
 ### Grounded EO local-only configuration
 
 The Grounded EO model is a local, in situ–trained Gaussian-process predictor. It is currently supported only for the variables `lai` and `fapar`, and it requires the `xee-local` export destination because prediction runs locally on the exported xarray dataset.
@@ -233,5 +259,5 @@ Note that exports with the same *system:index* will fail when writing to Earth E
 
 If you use **gee-biophys** in your research, please cite the associated publication (forthcoming):
 
-> Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 01 April 2025, PREPRINT (Version 1) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v1]
+> Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 23 April 2026, PREPRINT (Version 2) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v2]
 
