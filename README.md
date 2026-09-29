@@ -36,7 +36,7 @@ Each export includes:
 - Modular YAML configuration for reproducibility
 - Exports directly to **Google Earth Engine assets**, **Google Drive**, or **Google Cloud Storage**
 - Available as both a **Python package** and **CLI tool**
-- Supports three model families: **[s2biophys](https://www.researchsquare.com/article/rs-6343364/v1)**, **[SL2P](https://github.com/djamainajib/SL2P-PYTHON)**, and a local-only **Grounded EO** Gaussian-process model
+- Supports three model families: **[s2biophys](https://www.researchsquare.com/article/rs-6343364/v3)**, **[SL2P](https://github.com/djamainajib/SL2P-PYTHON)**, and a local-only **Grounded EO** Gaussian-process model
 - Grounded EO is available for **LAI** and **FAPAR** only and requires the **xee-local** export mode
 
 ------
@@ -177,7 +177,7 @@ variables:
 
 Names: `cold_evergreen_forest`, `open_tundra`, `arid_shrubland`, `temperate_nonforest`, `temperate_broadleaf_forest`, `temperate_evergreen_forest`, `tropical_forest`, `mediterranean_forest`. Numeric selectors are not accepted. The selected ensemble predicts the **full scene**, without masking to its vegetation class; normal input/cloud masks still apply (and the GEE path retains its water mask). Uncertainty currently reuses the global calibration table.
 
-Small examples: [broadleaf / GEE](example_configs/biome-lc-broadleaf-gee.yaml), [shrubland / GEE](example_configs/biome-lc-shrubland-gee.yaml), [nonforest / xee-local](example_configs/biome-lc-nonforest-local.yaml). Compare both models in the [executed notebook](notebooks/biome_lc_model_comparison.ipynb).
+Small examples: [broadleaf / GEE](https://github.com/speckerf/gee_biophys/blob/main/example_configs/biome-lc-broadleaf-gee.yaml), [shrubland / GEE](https://github.com/speckerf/gee_biophys/blob/main/example_configs/biome-lc-shrubland-gee.yaml), [nonforest / xee-local](https://github.com/speckerf/gee_biophys/blob/main/example_configs/biome-lc-nonforest-local.yaml). Compare both models in the [executed notebook](https://github.com/speckerf/gee_biophys/blob/main/notebooks/biome_lc_model_comparison.ipynb).
 
 ### Grounded EO local-only configuration
 
@@ -259,5 +259,5 @@ Note that exports with the same *system:index* will fail when writing to Earth E
 
 If you use **gee-biophys** in your research, please cite the associated publication (forthcoming):
 
-> Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 23 April 2026, PREPRINT (Version 2) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v2]
+> Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 29 September 2026, PREPRINT (Version 3) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v3]
 
