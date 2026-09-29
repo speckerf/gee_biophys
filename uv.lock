@@ -589,6 +589,7 @@ dependencies = [
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pandas" },
+    { name = "patch" },
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
@@ -617,6 +618,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "onnxruntime", specifier = ">=1.29.0" },
     { name = "pandas", specifier = ">=2.3.3" },
+    { name = "patch", specifier = ">=1.16" },
     { name = "pydantic", specifier = ">=2.12.4" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
@@ -1610,6 +1612,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/b2/3a/3f06f34820a31257d
 wheels = [
     { url = "https://files.pythonhosted.org/packages/71/e7/40fb618334dcdf7c5a316c0e7343c5cd82d3d866edc100d98e29bc945ecd/partd-1.4.2-py3-none-any.whl", hash = "sha256:978e4ac767ec4ba5b86c6eaa52e5a2a3bc748a2ca839e8cc798f1cc6ce6efb0f", size = 18905, upload-time = "2024-05-06T19:51:39.271Z" },
 ]
+
+[[package]]
+name = "patch"
+version = "1.16"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/74/0815f03c82f4dc738e2bfc5f8966f682bebcc809f30c8e306e6cc7156a99/patch-1.16.zip", hash = "sha256:c62073f356cff054c8ac24496f1a3d7cfa137835c31e9af39a9f5292fd75bd9f", size = 12809, upload-time = "2016-02-13T15:18:58.285Z" }
 
 [[package]]
 name = "pexpect"
