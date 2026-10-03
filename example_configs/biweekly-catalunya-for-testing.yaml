@@ -1,0 +1,37 @@
+# ============     GEE-Biophys  ================
+# Biweekly small catalunya area test
+# ==============================================
+
+spatial:
+  type: bbox                      # options: bbox, geojson
+  bbox: [1.53,41.74,1.57,41.77]    # [minLon(minx), minLat(miny), maxLon(maxy)]
+  region_name: catalunya-test-small          # optional; no spaces or underscores
+
+temporal:
+  start: "2022-05-01"
+  end:   "2022-08-01"
+  cadence:
+    type: fixed                   # options: fixed, seasons
+    interval: biweekly
+
+variables:
+  model: s2biophys                # options: s2biophys, sl2p, groundedeo (only)
+  variable: laie                 # options: laie, fapar, fcover
+  bands: [mean, stdDev, stdDev_within, stdDev_across, count] 
+
+export:
+  destination: xee-local
+  folder: "exports/laie-catalunya"
+  crs: "LOCAL_UTM"
+  scale: 20
+
+
+options:
+  # cloud masking options
+  max_cloud_cover: 5             # 0..100 (uses S2 metadata if applicable)
+  csplus_band: cs                 # options: cs, cs_cdf
+  cs_plus_threshold: 0.70         # 0.0..1.0 (higher = more conservative)
+  clip_min_max: true
+  prediction_mode: predict_then_aggregate
+
+version: "v02"                    # corresponds to current s2biophys version, allows future changes

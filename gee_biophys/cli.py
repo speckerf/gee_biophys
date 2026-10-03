@@ -5,6 +5,7 @@ import shutil
 from datetime import timezone
 from pathlib import Path
 
+import ee
 import numpy as np
 import typer
 import yaml
@@ -76,6 +77,24 @@ def run_pipeline(config: str, set_public: bool = False) -> None:
             logger.debug(
                 "Running local prediction via xee/xarray. This is not recommended for very large exports (> 100x100km area) at 20m resolution."
             )
+
+            try:
+                n_images = imgc.size().getInfo()
+            except ee.ee_exception.EEException as exc:
+                if (
+                    "Image.bandNames: Parameter 'image' is required and may not be null"
+                    in str(exc)
+                ):
+                    logger.warning(
+                        f"Skipping interval {interval_start} to {interval_end}: No images found for this interval."
+                    )
+                    continue
+                raise
+            if n_images == 0:
+                logger.warning(
+                    f"Skipping interval {interval_start} to {interval_end}: No images found for this interval."
+                )
+                continue
 
             input_ds = convert_s2_input_to_xarray(cfg, imgc)
             output_ds = biophys_predict_local(
@@ -165,6 +184,7 @@ def run(
 
 if __name__ == "__main__":
     # config_path = Path("example_configs/grounded_eo_local.yaml")
-    config_path = Path("example_configs/seasonal-zambia-arid_shrubland.yaml")
+    # config_path = Path("example_configs/seasonal-zambia-arid_shrubland.yaml")
+    config_path = Path("example_configs/biweekly-catalunya.yaml")
     run_pipeline(config_path, set_public=True)  # for debugging purposes
     # app()

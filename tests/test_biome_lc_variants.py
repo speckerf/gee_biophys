@@ -7,13 +7,13 @@ import numpy as np
 import pytest
 import yaml
 from pydantic import ValidationError
+from test_local_predict import _make_s2_dataset
 
 from gee_biophys.config import ConfigParams, Variables
 from gee_biophys.model_variants import GROUP_NAME_TO_GROUP_NUM
 from gee_biophys.models.s2biophys import load_biome_land_cover_specific_model_ensemble
 from gee_biophys.s2_predict import biophys_predict_local
 from gee_biophys.utils import get_system_index
-from test_local_predict import _make_s2_dataset
 
 MODEL = "s2biophys-biome-lc-specific"
 
@@ -69,16 +69,26 @@ def test_variant_cannot_be_silently_ignored():
 def test_example_configs(monkeypatch, path):
     monkeypatch.setattr("ee.Initialize", lambda **kwargs: None)
     data = yaml.safe_load(path.read_text())
-    west, south, east, north = data["spatial"]["bbox"]
+
+    lon, lat = data["spatial"]["square_center"]
+    bbox = [lon - 0.01, lat - 0.01, lon + 0.01, lat + 0.01]
+
+    data["spatial"].update(type="bbox", bbox=bbox)
+    data["spatial"].pop("square_center", None)
+    data["spatial"].pop("square_length", None)
+
     geometry = MagicMock()
     geometry.centroid.return_value.coordinates.return_value.getInfo.return_value = [
-        (west + east) / 2,
-        (south + north) / 2,
+        lon,
+        lat,
     ]
     monkeypatch.setattr("ee.Geometry.BBox", lambda *args: geometry)
+
     cfg = ConfigParams(**data)
     west, south, east, north = cfg.spatial.bbox
-    assert 0 < east - west < 0.5 and 0 < north - south < 0.5
+
+    assert 0 < east - west < 0.5
+    assert 0 < north - south < 0.5
     assert len(list(cfg.temporal.iter_date_ranges())) == 1
     assert len(get_system_index(cfg, cfg.temporal.start, cfg.temporal.end)) <= 100
 
