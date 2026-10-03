@@ -261,3 +261,7 @@ If you use **gee-biophys** in your research, please cite the associated publicat
 
 > Felix Specker, Anna K. Schweiger, Jean-Baptiste Féret et al. Advancing Ecosystem Monitoring with Global High-Resolution Maps of Vegetation Biophysical Properties, 29 September 2026, PREPRINT (Version 3) available at Research Square [https://doi.org/10.21203/rs.3.rs-6343364/v3]
 
+
+### Acknowledgments
+
+The Open-Earth-Monitor Cyberinfrastructure (OEMC) project has received funding from the European Union’s Horizon Europe research and innovation programme under grant agreement No. 101059548.
