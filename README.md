@@ -105,7 +105,7 @@ Alternatively, check progress directly using the logged task ID: `earthengine ta
 ### Visualize results
 
 To visualize results, please use the following earth-engine app: [here](https://ee-speckerfelix.projects.earthengine.app/view/gee-biophys-export-visualizer). Note that this requires that the option `--public` was set when running `gee-biophys`. 
-Alternatively, the source code of the app can also be directly to visualize a non-public `ImageCollection`. 
+Alternatively, the source code of the app is available [here](https://github.com/speckerf/gee_biophys/blob/f5d3340a1ddb9459a58a29dea97a97c0ef20847b/app/gee-biophys-export-visualizer.js), for visualizing a non-public `ImageCollection`. 
 
 ------
 
